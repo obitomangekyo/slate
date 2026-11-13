@@ -1,0 +1,21 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+allowBuilds:
+  esbuild: true
+  lefthook: true
+permissions:
+  "@tanstack/devtools-vite":
+    skills: true
+  "@tanstack/react-router":
+    skills: [router-query, migrate-from-react-router, react-router]
+  "@tanstack/react-start":
+    skills: [migrate-from-nextjs, react-start]
+skills:
+  dirs:
+    - .agent/skills
+    - .agents/skills
+    - .claude/skills
+    - .cursor/skills
+    - .gemini/skills
+    - .github/skills
