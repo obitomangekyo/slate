@@ -1,11 +1,20 @@
-import { TanStackDevtools } from "@tanstack/react-devtools";
-import { createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
-import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
-import { type ReactNode, useMemo } from "react";
-
+import { createRootRoute } from "@tanstack/react-router";
+import { RootError, RootNotFound, RootPending } from "@/components/root/root-boundaries";
+import { RootDocument } from "@/components/root/root-document";
+import { RootLayout } from "@/components/root/root-layout";
+import { reportError } from "@/lib/error-reporting";
+import { generateStructuredData, SEO } from "@/lib/seo";
 import appCss from "@/styles.css?url";
 
 export const Route = createRootRoute({
+  wrapInSuspense: true,
+  pendingMs: 200,
+  pendingMinMs: 350,
+  pendingComponent: RootPending,
+  errorComponent: RootError,
+  notFoundComponent: RootNotFound,
+  onError: (error) => reportError(error, { kind: "router.onError" }),
+  onCatch: (error) => reportError(error, { kind: "router.onCatch" }),
   head: () => ({
     meta: [
       {
@@ -16,40 +25,100 @@ export const Route = createRootRoute({
         content: "width=device-width, initial-scale=1",
       },
       {
-        title: "Slate Engine",
+        name: "referrer",
+        content: "strict-origin-when-cross-origin",
+      },
+      {
+        name: "color-scheme",
+        content: "light",
+      },
+      {
+        title: SEO.title,
+      },
+      {
+        name: "description",
+        content: SEO.description,
+      },
+      {
+        name: "application-name",
+        content: "Slate",
+      },
+      {
+        name: "theme-color",
+        content: SEO.themeColor,
+      },
+      {
+        name: "author",
+        content: SEO.siteName,
+      },
+      {
+        name: "robots",
+        content: "index,follow,max-image-preview:large",
+      },
+      {
+        property: "og:type",
+        content: "website",
+      },
+      {
+        property: "og:site_name",
+        content: "Slate",
+      },
+      {
+        property: "og:title",
+        content: SEO.title,
+      },
+      {
+        property: "og:description",
+        content: SEO.description,
+      },
+      ...(SEO.siteUrl ? [{ property: "og:url", content: SEO.siteUrl }] : []),
+      {
+        property: "og:locale",
+        content: "en_US",
+      },
+      {
+        name: "twitter:card",
+        content: "summary",
+      },
+      {
+        name: "twitter:title",
+        content: SEO.title,
+      },
+      {
+        name: "twitter:description",
+        content: SEO.description,
       },
     ],
     links: [
+      { rel: "stylesheet", href: appCss },
+      { rel: "icon", type: "image/x-icon", href: "/favicon.ico" },
       {
-        rel: "stylesheet",
-        href: appCss,
+        rel: "icon",
+        type: "image/png",
+        sizes: "32x32",
+        href: "/favicon-32x32.png",
+      },
+      {
+        rel: "icon",
+        type: "image/png",
+        sizes: "16x16",
+        href: "/favicon-16x16.png",
+      },
+      {
+        rel: "apple-touch-icon",
+        sizes: "180x180",
+        href: "/apple-touch-icon.png",
+      },
+      { rel: "manifest", href: "/manifest.json" },
+      ...(SEO.siteUrl ? [{ rel: "canonical", href: SEO.siteUrl }] : []),
+    ],
+    scripts: [
+      {
+        type: "application/ld+json",
+        children: JSON.stringify(generateStructuredData()),
       },
     ],
   }),
   shellComponent: RootDocument,
+  component: RootLayout,
 });
-
-function RootDocument({ children }: { children: ReactNode }) {
-  const devtoolsPlugins = useMemo(
-    () => [
-      {
-        name: "Tanstack Router",
-        render: <TanStackRouterDevtoolsPanel />,
-      },
-    ],
-    [],
-  );
-
-  return (
-    <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        {children}
-        <TanStackDevtools plugins={devtoolsPlugins} />
-        <Scripts />
-      </body>
-    </html>
-  );
-}

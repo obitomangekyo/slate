@@ -1,6 +1,41 @@
 @import "tailwindcss";
+@import "@fontsource-variable/inter";
+
+@theme inline {
+  --font-sans: "Inter Variable", sans-serif;
+}
+
+:root {
+  height: 100%;
+  color-scheme: light;
+  --color-ink: #18262b;
+  --color-paper: #f2ecdd;
+  --color-paper-raised: #faf7ef;
+  --color-mineral: #54776e;
+  --color-mineral-dark: #36584f;
+  --color-clay: #ce684b;
+  --color-citron: #d2d27a;
+  --color-line: #d8d1c1;
+  --color-muted: #65716d;
+
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: "Inter Variable", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
 
 html,
 body {
   min-height: 100%;
+}
+
+body {
+  background: var(--color-paper);
+}
+
+::selection {
+  background: var(--color-citron);
+  color: var(--color-ink);
 }

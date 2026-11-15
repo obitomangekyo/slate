@@ -1,0 +1,28 @@
+{
+  "id": "/",
+  "name": "Slate — collaborative retrospectives",
+  "short_name": "Slate",
+  "description": "A real-time workspace for engineering teams to map the work, make sense of it together, and turn honest retrospectives into clear next steps.",
+  "lang": "en",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
+  "orientation": "any",
+  "background_color": "#f2ecdd",
+  "theme_color": "#18262b",
+  "categories": ["business", "productivity", "collaboration"],
+  "icons": [
+    {
+      "src": "/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

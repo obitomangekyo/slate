@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" preserveAspectRatio="xMidYMid meet" viewBox="0 0 1024 1024" role="img" aria-labelledby="title description">
+  <title id="title">Slate app icon</title>
+  <desc id="description">A warm paper mapping board on an ink tile, with citron and clay notes linked by a curved mineral connector.</desc>
+
+  <!-- Transparent canvas outside the rounded app tile. -->
+  <g id="app-tile">
+    <rect id="tile-background" x="160" y="160" width="704" height="704" rx="148" fill="#18262B"/>
+  </g>
+
+  <g id="mapping-board">
+    <rect id="paper-board" x="258" y="276" width="508" height="472" rx="40" fill="#F2ECDD"/>
+  </g>
+
+  <!-- The connector sits behind the notes so its endpoints feel intentional. -->
+  <g id="relationship" fill="none" stroke="#36584F" stroke-width="18" stroke-linecap="round" stroke-linejoin="round">
+    <path id="curved-connection" d="M 493 432 C 568 435, 612 478, 618 552"/>
+  </g>
+
+  <g id="ideas">
+    <rect id="citron-note" x="312" y="322" width="190" height="174" rx="20" fill="#D2D27A"/>
+    <rect id="clay-note" x="556" y="556" width="180" height="150" rx="20" fill="#CE684B"/>
+  </g>
+
+  <g id="annotation">
+    <rect id="mineral-mark" x="314" y="580" width="160" height="96" rx="18" fill="#54776E"/>
+    <circle id="quiet-point" cx="690" cy="370" r="17" fill="#36584F"/>
+  </g>
+</svg>

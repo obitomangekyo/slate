@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# TODO: Replace slate.example with the production hostname before launch.
+Sitemap: https://slate.example/sitemap.xml

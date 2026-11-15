@@ -1,5 +1,5 @@
 {
-  "name": "slate-engine",
+  "name": "slate",
   "private": true,
   "scripts": {
     "dev": "pnpm --parallel --filter \"./apps/*\" dev",
@@ -9,6 +9,10 @@
     "lint:fix": "oxlint --fix && biome check --write .",
     "prepare": "[ -n \"$CI\" ] || lefthook install",
     "build": "pnpm --filter @slate/shared build && pnpm --filter \"./apps/*\" build"
+  },
+  "dependencies": {
+    "@t3-oss/env-core": "^0.13.11",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.7",
@@ -23,10 +27,10 @@
   "devEngines": {
     "packageManager": {
       "name": "pnpm",
-      "version": "12.19.0",
+      "version": "12.21.0",
       "onFail": "download"
     }
   },
-  "packageManager": "pnpm@12.19.0",
+  "packageManager": "pnpm@12.21.0",
   "type": "module"
 }
