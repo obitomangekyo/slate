@@ -31,8 +31,19 @@
       },
       "suspicious": {
         "noExplicitAny": "error"
+      },
+      "nursery": {
+        "useTailwindSortedClasses": {
+          "level": "error",
+          "fix": "safe"
+        }
       }
     }
+  },
+  "tailwind": {
+    "attributes": ["className"],
+    "mergeFunctions": ["cn"],
+    "variantFunctions": ["cva"]
   },
   "css": {
     "parser": {

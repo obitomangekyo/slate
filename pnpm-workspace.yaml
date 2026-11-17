@@ -7,10 +7,14 @@ allowBuilds:
 permissions:
   "@tanstack/devtools-vite":
     skills: true
+  "@tanstack/react-hotkeys":
+    skills: true
   "@tanstack/react-router":
     skills: [router-query, migrate-from-react-router, react-router]
   "@tanstack/react-start":
     skills: [migrate-from-nextjs, react-start]
+  pnpm:
+    build: true
 skills:
   dirs:
     - .agent/skills

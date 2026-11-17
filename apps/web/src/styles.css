@@ -3,11 +3,6 @@
 
 @theme inline {
   --font-sans: "Inter Variable", sans-serif;
-}
-
-:root {
-  height: 100%;
-  color-scheme: light;
   --color-ink: #18262b;
   --color-paper: #f2ecdd;
   --color-paper-raised: #faf7ef;
@@ -17,6 +12,11 @@
   --color-citron: #d2d27a;
   --color-line: #d8d1c1;
   --color-muted: #65716d;
+}
+
+:root {
+  height: 100%;
+  color-scheme: light;
 
   background: var(--color-paper);
   color: var(--color-ink);

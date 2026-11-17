@@ -10,33 +10,53 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SIndexRouteImport } from './routes/s/index'
+import { Route as SSlateIdIndexRouteImport } from './routes/s/$slateId/index'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SIndexRoute = SIndexRouteImport.update({
+  id: '/s/',
+  path: '/s/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SSlateIdIndexRoute = SSlateIdIndexRouteImport.update({
+  id: '/s/$slateId/',
+  path: '/s/$slateId/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/s/': typeof SIndexRoute
+  '/s/$slateId/': typeof SSlateIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/s': typeof SIndexRoute
+  '/s/$slateId': typeof SSlateIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/s/': typeof SIndexRoute
+  '/s/$slateId/': typeof SSlateIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/s/' | '/s/$slateId/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/s' | '/s/$slateId'
+  id: '__root__' | '/' | '/s/' | '/s/$slateId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  SIndexRoute: typeof SIndexRoute
+  SSlateIdIndexRoute: typeof SSlateIdIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +68,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/s/': {
+      id: '/s/'
+      path: '/s'
+      fullPath: '/s/'
+      preLoaderRoute: typeof SIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/s/$slateId/': {
+      id: '/s/$slateId/'
+      path: '/s/$slateId'
+      fullPath: '/s/$slateId/'
+      preLoaderRoute: typeof SSlateIdIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  SIndexRoute: SIndexRoute,
+  SSlateIdIndexRoute: SSlateIdIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
