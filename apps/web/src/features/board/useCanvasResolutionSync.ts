@@ -10,7 +10,7 @@ import { type RefObject, useLayoutEffect } from "react";
 export function useCanvasResolutionSync(
   dotGridCanvasRef: RefObject<HTMLCanvasElement | null>,
   redrawDotGridAndSyncItemsStage: () => void,
-): void {
+) {
   // useLayoutEffect (not the usual useEffect) on purpose. Resizing a canvas wipes
   // it clean. useLayoutEffect runs before the browser shows anything, so the
   // person never sees a blank or blurry canvas for a split second. This is the

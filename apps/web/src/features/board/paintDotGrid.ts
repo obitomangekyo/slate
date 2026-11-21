@@ -32,7 +32,7 @@ export function paintDotGrid({
   cameraOffsetX,
   cameraOffsetY,
   zoomLevel,
-}: PaintDotGridOptions): void {
+}: PaintDotGridOptions) {
   // Ask the canvas for its "pen" (the 2D drawing tool). If the browser refuses
   // to hand one over, nothing can be drawn, so quit quietly.
   const canvasContext = dotGridCanvas.getContext("2d");

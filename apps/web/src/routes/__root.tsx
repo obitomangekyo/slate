@@ -1,12 +1,14 @@
-import { createRootRoute } from "@tanstack/react-router";
-import { RootError, RootNotFound, RootPending } from "@/components/root/root-boundaries";
-import { RootDocument } from "@/components/root/root-document";
-import { RootLayout } from "@/components/root/root-layout";
-import { reportError } from "@/lib/error-reporting";
-import { generateStructuredData, SEO } from "@/lib/seo";
-import appCss from "@/styles.css?url";
+import type { QueryClient } from "@tanstack/react-query";
+import { createRootRouteWithContext } from "@tanstack/react-router";
+import { RootError, RootNotFound, RootPending } from "#/components/root/root-boundaries";
+import { RootDocument } from "#/components/root/root-document";
+import { RootLayout } from "#/components/root/root-layout";
+import { reportError } from "#/lib/error-reporting";
+import { generateStructuredData, SEO } from "#/lib/seo";
+import appCss from "#/styles.css?url";
 
-export const Route = createRootRoute({
+export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+  // Keep the document shell, loading UI, and error screens consistent on every route.
   wrapInSuspense: true,
   pendingMs: 200,
   pendingMinMs: 350,

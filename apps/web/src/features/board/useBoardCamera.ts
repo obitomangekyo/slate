@@ -5,7 +5,7 @@
 // ############################################################################
 
 import { type RefObject, useCallback, useRef } from "react";
-import { clampToRange } from "@/lib/clampToRange";
+import { clampToRange } from "#/lib/clampToRange";
 import { DEFAULT_ZOOM_LEVEL, MAX_ZOOM_LEVEL, MIN_ZOOM_LEVEL } from "./constants";
 import { paintDotGrid } from "./paintDotGrid";
 

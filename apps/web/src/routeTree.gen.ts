@@ -9,86 +9,152 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as SIndexRouteImport } from './routes/s/index'
-import { Route as SSlateIdIndexRouteImport } from './routes/s/$slateId/index'
+import { Route as Is_inRouteImport } from './routes/_is_in'
+import { Route as Is_inIndexRouteImport } from './routes/_is_in/index'
+import { Route as Is_outLoginRouteImport } from './routes/_is_out/login'
+import { Route as Is_outRegisterRouteImport } from './routes/_is_out/register'
+import { Route as Is_inSIndexRouteImport } from './routes/_is_in/s/index'
+import { Route as Is_inSSlateIdIndexRouteImport } from './routes/_is_in/s/$slateId/index'
 
-const IndexRoute = IndexRouteImport.update({
+const Is_inRoute = Is_inRouteImport.update({
+  id: '/_is_in',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const Is_inIndexRoute = Is_inIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => Is_inRoute,
+} as any)
+const Is_outLoginRoute = Is_outLoginRouteImport.update({
+  id: '/_is_out/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SIndexRoute = SIndexRouteImport.update({
+const Is_outRegisterRoute = Is_outRegisterRouteImport.update({
+  id: '/_is_out/register',
+  path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const Is_inSIndexRoute = Is_inSIndexRouteImport.update({
   id: '/s/',
   path: '/s/',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => Is_inRoute,
 } as any)
-const SSlateIdIndexRoute = SSlateIdIndexRouteImport.update({
+const Is_inSSlateIdIndexRoute = Is_inSSlateIdIndexRouteImport.update({
   id: '/s/$slateId/',
   path: '/s/$slateId/',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => Is_inRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
-  '/s/': typeof SIndexRoute
-  '/s/$slateId/': typeof SSlateIdIndexRoute
+  '/': typeof Is_inIndexRoute
+  '/login': typeof Is_outLoginRoute
+  '/register': typeof Is_outRegisterRoute
+  '/s/': typeof Is_inSIndexRoute
+  '/s/$slateId/': typeof Is_inSSlateIdIndexRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '/s': typeof SIndexRoute
-  '/s/$slateId': typeof SSlateIdIndexRoute
+  '/login': typeof Is_outLoginRoute
+  '/register': typeof Is_outRegisterRoute
+  '/': typeof Is_inIndexRoute
+  '/s': typeof Is_inSIndexRoute
+  '/s/$slateId': typeof Is_inSSlateIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
-  '/s/': typeof SIndexRoute
-  '/s/$slateId/': typeof SSlateIdIndexRoute
+  '/_is_in': typeof Is_inRouteWithChildren
+  '/_is_out/login': typeof Is_outLoginRoute
+  '/_is_out/register': typeof Is_outRegisterRoute
+  '/_is_in/': typeof Is_inIndexRoute
+  '/_is_in/s/': typeof Is_inSIndexRoute
+  '/_is_in/s/$slateId/': typeof Is_inSSlateIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/s/' | '/s/$slateId/'
+  fullPaths: '/' | '/login' | '/register' | '/s/' | '/s/$slateId/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/s' | '/s/$slateId'
-  id: '__root__' | '/' | '/s/' | '/s/$slateId/'
+  to: '/login' | '/register' | '/' | '/s' | '/s/$slateId'
+  id:
+    | '__root__'
+    | '/_is_in'
+    | '/_is_out/login'
+    | '/_is_out/register'
+    | '/_is_in/'
+    | '/_is_in/s/'
+    | '/_is_in/s/$slateId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  SIndexRoute: typeof SIndexRoute
-  SSlateIdIndexRoute: typeof SSlateIdIndexRoute
+  Is_inRoute: typeof Is_inRouteWithChildren
+  Is_outLoginRoute: typeof Is_outLoginRoute
+  Is_outRegisterRoute: typeof Is_outRegisterRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
+    '/_is_in': {
+      id: '/_is_in'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof Is_inRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_is_in/': {
+      id: '/_is_in/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+      preLoaderRoute: typeof Is_inIndexRouteImport
+      parentRoute: typeof Is_inRoute
+    }
+    '/_is_out/login': {
+      id: '/_is_out/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof Is_outLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/s/': {
-      id: '/s/'
+    '/_is_out/register': {
+      id: '/_is_out/register'
+      path: '/register'
+      fullPath: '/register'
+      preLoaderRoute: typeof Is_outRegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_is_in/s/': {
+      id: '/_is_in/s/'
       path: '/s'
       fullPath: '/s/'
-      preLoaderRoute: typeof SIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof Is_inSIndexRouteImport
+      parentRoute: typeof Is_inRoute
     }
-    '/s/$slateId/': {
-      id: '/s/$slateId/'
+    '/_is_in/s/$slateId/': {
+      id: '/_is_in/s/$slateId/'
       path: '/s/$slateId'
       fullPath: '/s/$slateId/'
-      preLoaderRoute: typeof SSlateIdIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof Is_inSSlateIdIndexRouteImport
+      parentRoute: typeof Is_inRoute
     }
   }
 }
 
+interface Is_inRouteChildren {
+  Is_inIndexRoute: typeof Is_inIndexRoute
+  Is_inSIndexRoute: typeof Is_inSIndexRoute
+  Is_inSSlateIdIndexRoute: typeof Is_inSSlateIdIndexRoute
+}
+
+const Is_inRouteChildren: Is_inRouteChildren = {
+  Is_inIndexRoute: Is_inIndexRoute,
+  Is_inSIndexRoute: Is_inSIndexRoute,
+  Is_inSSlateIdIndexRoute: Is_inSSlateIdIndexRoute,
+}
+
+const Is_inRouteWithChildren = Is_inRoute._addFileChildren(Is_inRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
-  SIndexRoute: SIndexRoute,
-  SSlateIdIndexRoute: SSlateIdIndexRoute,
+  Is_inRoute: Is_inRouteWithChildren,
+  Is_outLoginRoute: Is_outLoginRoute,
+  Is_outRegisterRoute: Is_outRegisterRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
