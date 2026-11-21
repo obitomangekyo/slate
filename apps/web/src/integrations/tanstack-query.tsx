@@ -1,5 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { ReactNode } from "react";
+import { QueryClient } from "@tanstack/react-query";
 
 interface QueryContext {
   queryClient: QueryClient;
@@ -20,15 +19,4 @@ export function getContext(): QueryContext {
   });
 
   return { queryClient };
-}
-
-export function Provider({
-  children,
-  queryClient,
-}: {
-  children: ReactNode;
-  queryClient: QueryClient;
-}) {
-  // Make the router-owned cache available to queries throughout the React tree.
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 }
