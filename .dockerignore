@@ -1,0 +1,17 @@
+# Keep local credentials out of the build, but allow the safe example file.
+.git
+.env
+.env.*
+!.env.example
+# The image installs dependencies and creates build output itself.
+**/node_modules
+**/.output
+**/dist
+# Editor and assistant settings are not needed to run the apps.
+.github
+.agents
+.claude
+.cursor
+.gemini
+# Documentation is not runtime input for either container.
+*.md
