@@ -122,7 +122,23 @@ Lefthook also runs commit-message checks, staged-file formatting/linting, and pr
 - API secrets belong in `.env` locally or GitHub Environment secrets during deployment.
 - `VITE_API_URL`, `WEB_APP_URL`, `CORS_ORIGINS`, and `GOOGLE_REDIRECT_URI` must agree with the deployed origins.
 - GitHub Actions deploys tested revisions from `dev` and `staging` to separate Fly.io web and API apps.
+- Production deployment is manually triggered from Actions and promotes the latest successful staging commit after CI passes and the commit is merged into `main`.
 - The complete GitHub Variables and Secrets setup is documented in [`.env.example`](.env.example).
+
+### Production deployment
+
+The `Deploy production to Fly.io` workflow is manual-only. Run it from the `main` branch
+in GitHub Actions. Before it can access the `production` Environment, it verifies that the
+latest staging push and current `main` commit passed CI, both staging Fly deployment jobs
+succeeded for that exact staging commit, and the staged commit is included in `main`. It
+then imports the production API settings into Fly and deploys the API followed by the web
+app from that same commit.
+
+Configure the `production` GitHub Environment with its own `FLY_WEB_APP`, `FLY_API_APP`,
+`VITE_API_URL`, `WEB_APP_URL`, and `GOOGLE_REDIRECT_URI` variables, plus the Fly deploy
+tokens and API runtime secrets listed in [`.env.example`](.env.example). Optional Sentry
+variables can be omitted. Add required reviewers to the GitHub Environment if production
+deployments should require approval after the staging checks pass.
 
 ## Product direction
 

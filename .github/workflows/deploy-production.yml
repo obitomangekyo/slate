@@ -1,0 +1,218 @@
+name: Deploy production to Fly.io
+run-name: Promote latest staging deployment to production
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: fly-production
+  cancel-in-progress: false
+
+jobs:
+  verify-release:
+    name: Verify staging release
+    runs-on: ubuntu-latest
+    outputs:
+      release_sha: ${{ steps.verify.outputs.release_sha }}
+    steps:
+      - name: Verify CI and staging deployment
+        id: verify
+        uses: actions/github-script@v7
+        with:
+          script: |
+            if (context.ref !== "refs/heads/main") {
+              core.setFailed("Production deployment must be started from the main branch.");
+              return;
+            }
+
+            const { owner, repo } = context.repo;
+            const { data: ciRuns } = await github.rest.actions.listWorkflowRuns({
+              owner,
+              repo,
+              workflow_id: "ci.yml",
+              branch: "staging",
+              event: "push",
+              per_page: 100,
+            });
+            const latestCi = ciRuns.workflow_runs[0];
+            if (!latestCi || latestCi.status !== "completed" || latestCi.conclusion !== "success") {
+              core.setFailed("The latest CI run for staging must complete successfully before production.");
+              return;
+            }
+
+            const { data: mainBranch } = await github.rest.repos.getBranch({
+              owner,
+              repo,
+              branch: "main",
+            });
+            const { data: mainCiRuns } = await github.rest.actions.listWorkflowRuns({
+              owner,
+              repo,
+              workflow_id: "ci.yml",
+              branch: "main",
+              event: "push",
+              per_page: 100,
+            });
+            const latestMainCi = mainCiRuns.workflow_runs[0];
+            if (
+              !latestMainCi ||
+              latestMainCi.head_sha !== mainBranch.commit.sha ||
+              latestMainCi.status !== "completed" ||
+              latestMainCi.conclusion !== "success"
+            ) {
+              core.setFailed("The current main commit must also have a successful latest CI run before production.");
+              return;
+            }
+
+            const { data: deployRuns } = await github.rest.actions.listWorkflowRuns({
+              owner,
+              repo,
+              workflow_id: "deploy.yml",
+              event: "workflow_run",
+              per_page: 100,
+            });
+            const stagingDeploys = deployRuns.workflow_runs
+              .map((run) => {
+                const match = /^Deploy staging @ ([0-9a-f]{40})$/.exec(run.display_title);
+                return match ? { run, sha: match[1] } : null;
+              })
+              .filter(Boolean)
+              .sort((a, b) => Date.parse(b.run.created_at) - Date.parse(a.run.created_at));
+            const latestStaging = stagingDeploys[0];
+            if (!latestStaging) {
+              core.setFailed("No staging deployment run was found. Deploy the latest staging commit before promoting it.");
+              return;
+            }
+
+            if (latestStaging.sha !== latestCi.head_sha) {
+              core.setFailed("The latest staging deployment is not for the latest staging CI commit. Wait for staging deployment to finish, then retry.");
+              return;
+            }
+            if (latestStaging.run.status !== "completed" || latestStaging.run.conclusion !== "success") {
+              core.setFailed("The latest staging deployment did not complete successfully.");
+              return;
+            }
+
+            const { data: jobs } = await github.rest.actions.listJobsForWorkflowRun({
+              owner,
+              repo,
+              run_id: latestStaging.run.id,
+              per_page: 100,
+            });
+            for (const service of ["web", "api"]) {
+              const job = jobs.jobs.find((candidate) => candidate.name === `Deploy ${service} to staging`);
+              if (!job || job.status !== "completed" || job.conclusion !== "success") {
+                core.setFailed(`The staging ${service} deployment job did not complete successfully.`);
+                return;
+              }
+            }
+
+            const comparison = await github.request(
+              "GET /repos/{owner}/{repo}/compare/{base}...{head}",
+              {
+                owner,
+                repo,
+                base: latestStaging.sha,
+                head: "main",
+              },
+            );
+            if (!["ahead", "identical"].includes(comparison.data.status)) {
+              core.setFailed("The staged commit must be merged into main before production promotion.");
+              return;
+            }
+
+            core.setOutput("release_sha", latestStaging.sha);
+            core.info(`Verified staging deployment ${latestStaging.sha} for production.`);
+
+  deploy:
+    name: Deploy verified release
+    needs: verify-release
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout verified staging commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.verify-release.outputs.release_sha }}
+
+      - name: Validate production settings
+        env:
+          FLY_WEB_APP: ${{ vars.FLY_WEB_APP }}
+          FLY_API_APP: ${{ vars.FLY_API_APP }}
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+          WEB_APP_URL: ${{ vars.WEB_APP_URL }}
+          GOOGLE_REDIRECT_URI: ${{ vars.GOOGLE_REDIRECT_URI }}
+          FLY_API_TOKEN_WEB: ${{ secrets.FLY_API_TOKEN_WEB }}
+          FLY_API_TOKEN_API: ${{ secrets.FLY_API_TOKEN_API }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET }}
+          JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+          EMAIL_VERIFICATION_SECRET: ${{ secrets.EMAIL_VERIFICATION_SECRET }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          MAIL_USER: ${{ secrets.MAIL_USER }}
+          MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+        run: |
+          for name in FLY_WEB_APP FLY_API_APP VITE_API_URL WEB_APP_URL GOOGLE_REDIRECT_URI \
+            FLY_API_TOKEN_WEB FLY_API_TOKEN_API MONGODB_URI JWT_ACCESS_SECRET JWT_REFRESH_SECRET \
+            EMAIL_VERIFICATION_SECRET GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET MAIL_USER MAIL_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Set $name in the production GitHub Environment."
+              exit 1
+            fi
+          done
+
+      - name: Setup flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@98172f70657cb3e15db199af139be99bd3e61200
+
+      - name: Import production API secrets and deploy API
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN_API }}
+          FLY_APP_NAME: ${{ vars.FLY_API_APP }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET }}
+          JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+          EMAIL_VERIFICATION_SECRET: ${{ secrets.EMAIL_VERIFICATION_SECRET }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          MAIL_USER: ${{ secrets.MAIL_USER }}
+          MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+          WEB_APP_URL: ${{ vars.WEB_APP_URL }}
+          GOOGLE_REDIRECT_URI: ${{ vars.GOOGLE_REDIRECT_URI }}
+          CORS_ORIGINS: ${{ vars.WEB_APP_URL }}
+        run: |
+          printf '%s\n' \
+            "MONGODB_URI=$MONGODB_URI" \
+            "JWT_ACCESS_SECRET=$JWT_ACCESS_SECRET" \
+            "JWT_REFRESH_SECRET=$JWT_REFRESH_SECRET" \
+            "EMAIL_VERIFICATION_SECRET=$EMAIL_VERIFICATION_SECRET" \
+            "GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID" \
+            "GOOGLE_CLIENT_SECRET=$GOOGLE_CLIENT_SECRET" \
+            "MAIL_USER=$MAIL_USER" \
+            "MAIL_PASSWORD=$MAIL_PASSWORD" \
+            "WEB_APP_URL=$WEB_APP_URL" \
+            "GOOGLE_REDIRECT_URI=$GOOGLE_REDIRECT_URI" \
+            "CORS_ORIGINS=$CORS_ORIGINS" \
+            | flyctl secrets import --app "$FLY_APP_NAME" --stage
+          flyctl deploy . --config apps/api/fly.toml --app "$FLY_APP_NAME" --ha=true
+
+      - name: Deploy web app
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN_WEB }}
+          FLY_APP_NAME: ${{ vars.FLY_WEB_APP }}
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+          VITE_SITE_URL: ${{ vars.VITE_SITE_URL }}
+          VITE_SENTRY_DSN: ${{ vars.VITE_SENTRY_DSN }}
+          VITE_SENTRY_ENVIRONMENT: ${{ vars.VITE_SENTRY_ENVIRONMENT || 'production' }}
+          VITE_SENTRY_SECURITY_ENDPOINT: ${{ vars.VITE_SENTRY_SECURITY_ENDPOINT }}
+        run: |
+          flyctl deploy . --config apps/web/fly.toml --app "$FLY_APP_NAME" --ha=true \
+            --build-arg "VITE_API_URL=$VITE_API_URL" \
+            --build-arg "VITE_SITE_URL=$VITE_SITE_URL" \
+            --build-arg "VITE_SENTRY_DSN=$VITE_SENTRY_DSN" \
+            --build-arg "VITE_SENTRY_ENVIRONMENT=$VITE_SENTRY_ENVIRONMENT" \
+            --build-arg "VITE_SENTRY_SECURITY_ENDPOINT=$VITE_SENTRY_SECURITY_ENDPOINT"
