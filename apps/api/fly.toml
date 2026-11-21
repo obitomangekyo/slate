@@ -1,0 +1,33 @@
+app = "useslate-api-dev"
+
+[build]
+  dockerfile = "Dockerfile"
+
+
+[env]
+# This port must match the API container's PORT value.
+  PORT = "8080"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # Stop idle machines to reduce cost, then start them again when traffic returns.
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+[[http_service.checks]]
+# Do not send traffic until the API and its database connection are healthy.
+  grace_period = "10s"
+  # Check regularly, but allow enough time for slower startup and health responses.
+  interval = "30s"
+  method = "GET"
+  timeout = "5s"
+  path = "/health"
+
+[[vm]]
+  # Use one small shared CPU and 512 MB for this low-traffic API service.
+  cpu_kind = "shared"
+  cpus = 1
+  memory = "512mb"
