@@ -1,14 +1,16 @@
-import { Sentry } from "@/lib/sentry";
+import { Sentry } from "#/lib/sentry";
 
 type ErrorMeta = Record<string, unknown>;
 
 function serializeError(error: unknown) {
+  // Convert non-Error values into a small payload that can be recorded reliably.
   return error instanceof Error
     ? { message: error.message, stack: error.stack }
     : { message: String(error) };
 }
 
 export function reportError(error: unknown, meta?: ErrorMeta) {
+  // Keep the original error and extra context together for later debugging.
   const payload = {
     ...serializeError(error),
     meta,
@@ -22,6 +24,7 @@ export function reportError(error: unknown, meta?: ErrorMeta) {
 }
 
 export function normalizeError(error: unknown): Error {
+  // React boundaries expect an Error even when a loader threw a string or plain object.
   if (error instanceof Error) return error;
   if (typeof error === "string") return new Error(error);
   try {

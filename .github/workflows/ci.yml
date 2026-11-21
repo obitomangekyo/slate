@@ -1,10 +1,11 @@
 name: CI
 
 on:
+  # Check changes entering each shared deployment branch, plus direct pushes.
   push:
-    branches: [main]
+    branches: [main, dev, staging]
   pull_request:
-    branches: [main]
+    branches: [main, dev, staging]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -24,7 +25,8 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup pnpm & Node.js
-        uses: pnpm/action-setup@v6
+        # Use the action that installs this repository's pinned pnpm version.
+        uses: pnpm/setup@v3
         with:
           cache: true
 
