@@ -1,0 +1,115 @@
+name: Deploy to Fly.io
+
+on:
+  # Deploy only after CI reports success for the dev or staging branch.
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [dev, staging]
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy ${{ matrix.service }} to ${{ github.event.workflow_run.head_branch }}
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.workflow_run.head_branch == 'dev' && 'development' || 'staging' }}
+    concurrency:
+      group: fly-${{ github.event.workflow_run.head_branch }}-${{ matrix.service }}
+      cancel-in-progress: false
+    strategy:
+      # Build and deploy the web app and API as separate Fly apps.
+      matrix:
+        include:
+          # Each service uses its own Fly app name and deploy token.
+          - service: web
+            config: apps/web/fly.toml
+            app_variable: FLY_WEB_APP
+            token_secret: FLY_API_TOKEN_WEB
+          - service: api
+            config: apps/api/fly.toml
+            app_variable: FLY_API_APP
+            token_secret: FLY_API_TOKEN_API
+
+    steps:
+      - name: Checkout tested revision
+        # Use the exact commit CI checked, even if the branch moves meanwhile.
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Setup flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@98172f70657cb3e15db199af139be99bd3e61200
+
+      - name: Deploy web app
+        if: matrix.service == 'web'
+        env:
+          FLY_API_TOKEN: ${{ secrets[matrix.token_secret] }}
+          FLY_APP_NAME: ${{ vars[matrix.app_variable] }}
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+          VITE_SITE_URL: ${{ vars.VITE_SITE_URL }}
+          VITE_SENTRY_DSN: ${{ vars.VITE_SENTRY_DSN }}
+          VITE_SENTRY_ENVIRONMENT: ${{ vars.VITE_SENTRY_ENVIRONMENT || (github.event.workflow_run.head_branch == 'dev' && 'development' || 'production') }}
+          VITE_SENTRY_SECURITY_ENDPOINT: ${{ vars.VITE_SENTRY_SECURITY_ENDPOINT }}
+        run: |
+          # Fail early with a clear message when environment settings are missing.
+          if [ -z "$FLY_APP_NAME" ]; then
+            echo "::error::Set the FLY_WEB_APP variable for this GitHub environment."
+            exit 1
+          fi
+          if [ -z "$VITE_API_URL" ]; then
+            echo "::error::Set the VITE_API_URL variable for this GitHub environment to the API origin."
+            exit 1
+          fi
+          flyctl deploy . --config "${{ matrix.config }}" --app "$FLY_APP_NAME" --ha=true \
+            --build-arg "VITE_API_URL=$VITE_API_URL" \
+            --build-arg "VITE_SITE_URL=$VITE_SITE_URL" \
+            --build-arg "VITE_SENTRY_DSN=$VITE_SENTRY_DSN" \
+            --build-arg "VITE_SENTRY_ENVIRONMENT=$VITE_SENTRY_ENVIRONMENT" \
+            --build-arg "VITE_SENTRY_SECURITY_ENDPOINT=$VITE_SENTRY_SECURITY_ENDPOINT"
+
+      - name: Deploy API
+        if: matrix.service == 'api'
+        env:
+          FLY_API_TOKEN: ${{ secrets[matrix.token_secret] }}
+          FLY_APP_NAME: ${{ vars[matrix.app_variable] }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET }}
+          JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+          EMAIL_VERIFICATION_SECRET: ${{ secrets.EMAIL_VERIFICATION_SECRET }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          MAIL_USER: ${{ secrets.MAIL_USER }}
+          MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+          WEB_APP_URL: ${{ vars.WEB_APP_URL }}
+          GOOGLE_REDIRECT_URI: ${{ vars.GOOGLE_REDIRECT_URI }}
+          CORS_ORIGINS: ${{ vars.WEB_APP_URL }}
+        run: |
+          # Fly secrets are imported before deploy so the new machine can start safely.
+          if [ -z "$FLY_APP_NAME" ]; then
+            echo "::error::Set the FLY_API_APP variable for this GitHub environment."
+            exit 1
+          fi
+          for name in MONGODB_URI JWT_ACCESS_SECRET JWT_REFRESH_SECRET EMAIL_VERIFICATION_SECRET \
+            GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET MAIL_USER MAIL_PASSWORD WEB_APP_URL GOOGLE_REDIRECT_URI; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Set $name in the selected GitHub environment (as a secret, except WEB_APP_URL and GOOGLE_REDIRECT_URI, which are variables)."
+              exit 1
+            fi
+          done
+          cat <<EOF | flyctl secrets import --app "$FLY_APP_NAME" --stage
+          MONGODB_URI=$MONGODB_URI
+          JWT_ACCESS_SECRET=$JWT_ACCESS_SECRET
+          JWT_REFRESH_SECRET=$JWT_REFRESH_SECRET
+          EMAIL_VERIFICATION_SECRET=$EMAIL_VERIFICATION_SECRET
+          GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID
+          GOOGLE_CLIENT_SECRET=$GOOGLE_CLIENT_SECRET
+          MAIL_USER=$MAIL_USER
+          MAIL_PASSWORD=$MAIL_PASSWORD
+          WEB_APP_URL=$WEB_APP_URL
+          GOOGLE_REDIRECT_URI=$GOOGLE_REDIRECT_URI
+          CORS_ORIGINS=$CORS_ORIGINS
+          EOF
+          flyctl deploy . --config "${{ matrix.config }}" --app "$FLY_APP_NAME" --ha=true

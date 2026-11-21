@@ -1,5 +1,5 @@
 import * as Sentry from "@sentry/react";
-import { env } from "@/env";
+import { env } from "#/env";
 
 if (env.VITE_SENTRY_DSN) {
   Sentry.init({

@@ -1,1 +1,45 @@
-export const APP_NAME = "slate";
+// Export shared auth contracts so both apps validate and type the same payloads.
+export {
+  type AuthUser,
+  type EmailVerificationChallenge,
+  EmailVerificationChallengeSchema,
+  type LoginInput,
+  LoginInputSchema,
+  type RegisterInput,
+  RegisterInputSchema,
+  type ResendEmailVerificationResponse,
+  ResendEmailVerificationResponseSchema,
+  UserSchema,
+} from "#/auth";
+// Export common canvas values and limits from one stable package entry point.
+export {
+  COLLABORATOR_ROLES,
+  type CollaboratorRole,
+  CURSOR_COLORS,
+  DEFAULT_NOTE_DIMENSIONS,
+  MAX_EDGE_LABEL_LENGTH,
+  MAX_NOTE_CONTENT_LENGTH,
+  MAX_PASSWORD_LENGTH,
+  MAX_SLATE_TITLE_LENGTH,
+  MAX_USER_NAME_LENGTH,
+  MIN_NOTE_DIMENSIONS,
+  MIN_PASSWORD_LENGTH,
+  NODE_TONES,
+} from "#/constants";
+// Keep the error response contract available to both API and web code.
+export { type ApiErrorResponse, ApiErrorSchema } from "#/error";
+// Export the canvas data shapes used when reading and writing board contents.
+export {
+  type CanvasEdge,
+  CanvasEdgeSchema,
+  type CanvasNode,
+  CanvasNodeSchema,
+  type Dimensions,
+  DimensionsSchema,
+  type NodeTone,
+  NodeToneSchema,
+  type Point,
+  PointSchema,
+  type SlateMeta,
+  SlateMetaSchema,
+} from "#/schemas";
