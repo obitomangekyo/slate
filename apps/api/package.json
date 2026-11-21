@@ -3,16 +3,35 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
+  "imports": {
+    "#/*": {
+      "development": "./src/*.ts",
+      "types": "./src/*.ts",
+      "default": "./dist/*.js"
+    }
+  },
   "scripts": {
-    "dev": "node --watch src/index.ts",
+    "dev": "node --conditions=development --env-file-if-exists=../../.env --watch src/index.ts",
     "typecheck": "tsc --noEmit",
-    "build": "tsc"
+    "build": "tsc && cp -r src/email-templates dist/email-templates",
+    "start": "node dist/index.js"
   },
   "dependencies": {
     "@slate/shared": "workspace:*",
-    "express": "^5.3.0"
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "express": "^5.3.0",
+    "handlebars": "^4.7.10",
+    "jose": "^6.2.17",
+    "mongoose": "^9.12.2",
+    "nodemailer": "^7.0.13",
+    "pino": "^10.4.0",
+    "pino-http": "^11.0.0"
   },
   "devDependencies": {
-    "@types/express": "^5.0.6"
+    "@types/cookie-parser": "^1.4.10",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/nodemailer": "^8.0.2"
   }
 }

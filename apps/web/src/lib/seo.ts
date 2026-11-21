@@ -1,4 +1,4 @@
-import { env } from "@/env";
+import { env } from "#/env";
 
 export const SEO = {
   siteName: "Slate",
@@ -10,6 +10,7 @@ export const SEO = {
 } as const;
 
 export function generateStructuredData() {
+  // Use stable identifiers so crawlers can connect the site and application records.
   const websiteId = SEO.siteUrl ? `${SEO.siteUrl}/#website` : undefined;
   const applicationId = SEO.siteUrl ? `${SEO.siteUrl}/#application` : undefined;
 

@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { FramePlusIn, Plus } from "iconoir-react";
 import { type MouseEvent, useCallback } from "react";
-import SlateAppIcon from "@/assets/svgs/slate-app-icon.svg?react";
-import { Button } from "@/components/ui/button";
+import SlateAppIcon from "#/assets/svgs/slate-app-icon.svg?react";
+import { Button } from "#/components/ui/button";
 import {
   Empty,
   EmptyContent,
@@ -10,9 +10,9 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@/components/ui/empty";
+} from "#/components/ui/empty";
 
-export const Route = createFileRoute("/")({ component: RouteComponent });
+export const Route = createFileRoute("/_is_in/")({ component: RouteComponent });
 
 interface SlateSummary {
   id: string;

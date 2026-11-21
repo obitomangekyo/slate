@@ -19,7 +19,7 @@ type UseBoardKeyboardZoomOptions = {
 export function useBoardKeyboardZoom({
   zoomByMultiplierTowardCanvasCenter,
   resetCamera,
-}: UseBoardKeyboardZoomOptions): void {
+}: UseBoardKeyboardZoomOptions) {
   useHotkeys([
     {
       // Mod and the plus key (the = key, so no Shift is needed): zoom in.

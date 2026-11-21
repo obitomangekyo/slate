@@ -36,7 +36,7 @@ export function useBoardPointerAndWheelControls({
   shiftCameraByScreenDistance,
   zoomByMultiplierTowardScreenPoint,
   redrawDotGridAndSyncItemsStage,
-}: UseBoardPointerAndWheelControlsOptions): void {
+}: UseBoardPointerAndWheelControlsOptions) {
   // useEffect (not useLayoutEffect): all this does is attach listeners. It never
   // measures or changes anything the person sees, so there is no reason to
   // hold up the first paint for it.
