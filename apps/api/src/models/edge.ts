@@ -16,4 +16,4 @@ const edgeSchema = new Schema(
 );
 
 export type CanvasEdgeDocument = InferSchemaType<typeof edgeSchema>;
-export const CanvasEdgeModel = model("CanvasEdge", edgeSchema);
+export const CanvasEdgeModel = model<CanvasEdgeDocument>("CanvasEdge", edgeSchema);

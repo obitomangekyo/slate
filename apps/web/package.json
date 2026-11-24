@@ -19,6 +19,7 @@
     "@base-ui/react": "^1.9.0",
     "@fontsource-variable/inter": "^5.3.0",
     "@hookform/resolvers": "^7.0.7",
+    "@react-spring/web": "^10.1.2",
     "@slate/shared": "workspace:*",
     "@tailwindcss/vite": "^4.3.5",
     "@tanstack/react-devtools": "0.10.14",
@@ -34,12 +35,15 @@
     "@tanstack/react-start": "1.169.5",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.5.2",
+    "date-fns": "^4.4.0",
+    "embla-carousel-react": "^8.6.0",
     "iconoir-react": "^7.12.2",
     "input-otp": "^1.5.0",
     "nitro": "3.0.261103-rc",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-hook-form": "^7.92.0",
+    "react-use": "^17.6.1",
     "tailwindcss": "^4.3.5"
   },
   "devDependencies": {

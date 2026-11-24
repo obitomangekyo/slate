@@ -7,6 +7,7 @@ import { errorHandler } from "#/middleware/errorHandler";
 import { requestLogger } from "#/middleware/requestLogger";
 import { unknownEndpoint } from "#/middleware/unknownEndpoint";
 import { authRouter } from "#/routes/auth";
+import { slatesRouter } from "#/routes/slates";
 
 export const app: Express = express();
 
@@ -38,6 +39,7 @@ app.get("/health", (_, response) => {
 });
 
 app.use("/api/auth", authRouter);
+app.use("/api/slates", slatesRouter);
 // Put the not-found handler before the error handler so missing routes return JSON too.
 app.use(unknownEndpoint);
 app.use(errorHandler);

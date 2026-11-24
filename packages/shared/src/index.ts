@@ -24,6 +24,7 @@ export {
   MAX_USER_NAME_LENGTH,
   MIN_NOTE_DIMENSIONS,
   MIN_PASSWORD_LENGTH,
+  MIN_SLATE_TITLE_LENGTH,
   NODE_TONES,
 } from "#/constants";
 // Keep the error response contract available to both API and web code.
@@ -34,12 +35,20 @@ export {
   CanvasEdgeSchema,
   type CanvasNode,
   CanvasNodeSchema,
+  type CreateSlateInput,
+  CreateSlateInputSchema,
   type Dimensions,
   DimensionsSchema,
   type NodeTone,
   NodeToneSchema,
   type Point,
   PointSchema,
+  type SlateDetail,
+  SlateDetailSchema,
   type SlateMeta,
   SlateMetaSchema,
+  type SlateSummary,
+  SlateSummarySchema,
+  type UpdateSlateInput,
+  UpdateSlateInputSchema,
 } from "#/schemas";

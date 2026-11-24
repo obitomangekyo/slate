@@ -38,16 +38,15 @@ export async function loginWithPassword(input: LoginInput) {
     throw new HttpError(403, "Verify your email before signing in", {
       code: "EMAIL_VERIFICATION_REQUIRED",
       clearAuthCookies: true,
-      ...(user.emailVerificationChallengeId && user.emailVerificationExpiresAt
-        ? {
-            verification: {
-              challengeId: user.emailVerificationChallengeId,
-              email: user.email,
-              expiresAt: user.emailVerificationExpiresAt.toISOString(),
-              resendAvailableAt: (user.emailVerificationResendAt ?? new Date()).toISOString(),
-            },
-          }
-        : {}),
+      ...(user.emailVerificationChallengeId &&
+        user.emailVerificationExpiresAt && {
+          verification: {
+            challengeId: user.emailVerificationChallengeId,
+            email: user.email,
+            expiresAt: user.emailVerificationExpiresAt.toISOString(),
+            resendAvailableAt: (user.emailVerificationResendAt ?? new Date()).toISOString(),
+          },
+        }),
     });
   }
 

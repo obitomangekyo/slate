@@ -1,147 +1,209 @@
+import { useHotkeys } from "@tanstack/react-hotkeys";
+import { useDebouncedCallback } from "@tanstack/react-pacer";
 import { createFileRoute } from "@tanstack/react-router";
-import { FramePlusIn, Plus } from "iconoir-react";
-import { type MouseEvent, useCallback } from "react";
-import SlateAppIcon from "#/assets/svgs/slate-app-icon.svg?react";
+import { NavArrowDown, Search } from "iconoir-react";
+import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useIntersection } from "react-use";
+import { HomeStarredSection } from "#/components/home-starred-section";
+import { RecentSlateCard } from "#/components/recent-slate-card";
+import { Alert, AlertDescription, AlertTitle } from "#/components/ui/alert";
 import { Button } from "#/components/ui/button";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "#/components/ui/input-group";
+import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "#/components/ui/popover";
 import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "#/components/ui/empty";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "#/components/ui/select";
+import { Skeleton } from "#/components/ui/skeleton";
+import { WorkspaceHeader } from "#/components/workspace-header";
+import { useCreateSlateMutation, useSlatePagesQuery } from "#/lib/slates";
 
-export const Route = createFileRoute("/_is_in/")({ component: RouteComponent });
+export const Route = createFileRoute("/_is_in/")({
+  head: () => ({ meta: [{ title: "Home · Slate" }] }),
+  component: RouteComponent,
+});
 
-interface SlateSummary {
-  id: string;
-  title: string;
-  updatedAt: string;
-  nodeCount: number;
-}
-
-const INITIAL_SLATES: SlateSummary[] = [
-  {
-    id: "sprint-14-retro",
-    title: "Sprint 14 Engineering Retro",
-    updatedAt: "2 hours ago",
-    nodeCount: 18,
-  },
-  {
-    id: "q4-story-map",
-    title: "Checkout Flow Story Mapping",
-    updatedAt: "Yesterday",
-    nodeCount: 31,
-  },
-  {
-    id: "auth-architecture",
-    title: "Session Rotation & Edge Auth",
-    updatedAt: "3 days ago",
-    nodeCount: 9,
-  },
-];
+type SlateScope = "all" | "owned" | "shared";
 
 function RouteComponent() {
   const navigate = Route.useNavigate();
-
-  const handleOpenSlate = useCallback(
-    (event: MouseEvent<HTMLButtonElement>) => {
-      const slateId = event.currentTarget.dataset.slateId;
-      if (!slateId) return;
-      navigate({ to: "/s/$slateId", params: { slateId } });
-    },
-    [navigate],
+  const createSlate = useCreateSlateMutation();
+  const create = useCallback(
+    () =>
+      createSlate.mutate(undefined, {
+        onSuccess: (slate) => navigate({ to: "/s/$slateId", params: { slateId: slate.id } }),
+      }),
+    [createSlate, navigate],
   );
+  const [searchText, setSearchText] = useState("");
+  const [search, setSearch] = useState("");
+  const [scope, setScope] = useState<SlateScope>("all");
+  const [starred, setStarred] = useState("all");
+  const endRef = useRef<HTMLDivElement>(null);
+  const end = useIntersection(endRef as unknown as RefObject<HTMLElement>, {
+    root: null,
+    rootMargin: "240px",
+    threshold: 0,
+  });
+  const saveSearch = useDebouncedCallback((value: string) => setSearch(value.trim()), {
+    wait: 300,
+  });
+  const query = useSlatePagesQuery({
+    ...(search && { search }),
+    scope,
+    ...(starred !== "all" && { starred: starred === "true" }),
+  });
+  const { fetchNextPage, hasNextPage, isFetchingNextPage } = query;
+  const slates = useMemo(
+    () => query.data?.pages.flatMap((page) => page.slates) ?? [],
+    [query.data],
+  );
+
+  // Load the next page before the person reaches the end of the slate grid.
+  useEffect(() => {
+    if (end?.isIntersecting && hasNextPage && !isFetchingNextPage) {
+      fetchNextPage().catch(() => undefined);
+    }
+  }, [end?.isIntersecting, fetchNextPage, hasNextPage, isFetchingNextPage]);
+
+  // Leave browser shortcuts alone while someone is typing in a field.
+  useHotkeys([
+    {
+      hotkey: "Mod+N",
+      callback: (event) => {
+        const target = event.target;
+        if (
+          target instanceof HTMLElement &&
+          (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))
+        )
+          return;
+        event.preventDefault();
+        if (!createSlate.isPending) create();
+      },
+    },
+  ]);
 
   return (
     <>
-      {/* Top Room Header */}
-      <header className="border-line bg-paper-raised border-b">
-        <div className="container mx-auto flex h-16 w-11/12 items-center justify-between md:h-18 lg:h-16 xl:h-18">
-          <div className="flex items-center text-xs leading-none">
-            <SlateAppIcon aria-hidden="true" className="h-[3em]" />
-            <span className="mr-3 ml-1 text-[2em] font-semibold tracking-tight">Slate</span>
-            <span className="border-line bg-paper text-muted rounded-xs border px-2 py-1">
-              Workspace
-            </span>
-          </div>
-
-          <Button type="button">
-            <Plus /> New Slate
-          </Button>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="container mx-auto w-11/12 py-10">
-        {/* Section Bar & Filter Tabs */}
-        <div className="border-line mb-8 flex flex-wrap items-center justify-between gap-4 border-b pb-4">
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight">Project Slates</h1>
-            <p className="text-muted mt-0.5 text-sm">
-              Spatial boards for team retrospectives and system mapping.
-            </p>
-          </div>
-        </div>
-
-        {/* Slates Grid */}
-        {INITIAL_SLATES.length === 0 ? (
-          <Empty>
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <FramePlusIn strokeWidth={1.75} />
-              </EmptyMedia>
-              <EmptyTitle>No slates on the table yet</EmptyTitle>
-              <EmptyDescription>
-                Open a fresh spatial surface to map system flows, drop notes, and run live team
-                retros.
-              </EmptyDescription>
-            </EmptyHeader>
-            <EmptyContent>
-              <Button type="button">
-                <Plus strokeWidth={2} data-icon="inline-start" />
-                Create new slate
+      <WorkspaceHeader />
+      <main className="container mx-auto w-11/12 space-y-8 py-8 md:py-10">
+        <HomeStarredSection />
+        <section aria-labelledby="recents-heading">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <h2 id="recents-heading" className="text-lg font-semibold tracking-tight">
+              Recents
+            </h2>
+            {slates.length > 0 && (
+              <Button onClick={create} disabled={createSlate.isPending}>
+                {createSlate.isPending ? "Creating..." : "New slate"}
               </Button>
-            </EmptyContent>
-          </Empty>
-        ) : (
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {INITIAL_SLATES.map((slate) => (
-              <article
-                key={slate.id}
-                className="group border-line bg-paper-raised hover:border-mineral relative flex flex-col justify-between rounded-sm border transition-colors"
-              >
-                <button
-                  type="button"
-                  onClick={handleOpenSlate}
-                  data-slate-id={slate.id}
-                  className="flex flex-1 flex-col rounded-[inherit] text-left focus:outline-none"
-                >
-                  {/* Tactile Paper Preview Surface */}
-                  <div className="border-line bg-paper relative h-36 rounded-t-[inherit] border-b p-4">
-                    <div className="flex gap-2 opacity-75">
-                      <span className="border-line bg-paper-raised h-8 w-12 rounded-xs border" />
-                      <span className="border-clay/40 bg-paper-raised mt-3 h-8 w-14 rounded-xs border" />
-                      <span className="border-mineral/40 bg-paper-raised h-7 w-10 rounded-xs border" />
-                    </div>
-                  </div>
-
-                  {/* Card Metadata */}
-                  <div className="flex flex-1 flex-col justify-between p-4">
-                    <h2 className="text-ink group-hover:text-mineral-dark font-medium">
-                      {slate.title}
-                    </h2>
-                    <div className="text-muted mt-4 flex items-center justify-between text-xs">
-                      <span>{slate.nodeCount} items</span>
-                      <span>Edited {slate.updatedAt}</span>
-                    </div>
-                  </div>
-                </button>
-              </article>
-            ))}
+            )}
           </div>
-        )}
+
+          <div className="mb-5 flex flex-wrap gap-3">
+            <InputGroup className="min-w-56 flex-1">
+              <InputGroupAddon aria-hidden="true">
+                <Search />
+              </InputGroupAddon>
+              <InputGroupInput
+                aria-label="Search slates, people, or IDs"
+                value={searchText}
+                onChange={(event) => {
+                  setSearchText(event.target.value);
+                  saveSearch(event.target.value);
+                }}
+                placeholder="Search slates, people, or IDs"
+              />
+            </InputGroup>
+            <Popover>
+              <PopoverTrigger className="border-line bg-paper-raised text-ink hover:bg-paper flex h-9 items-center gap-2 rounded-sm border px-3 text-sm transition-colors">
+                Filters <NavArrowDown aria-hidden="true" />
+              </PopoverTrigger>
+              <PopoverContent
+                align="end"
+                className="border-line bg-paper-raised text-ink w-72 gap-4 rounded-sm border p-4 shadow-[0_12px_32px_-18px_rgba(24,38,43,0.38)]"
+              >
+                <PopoverTitle className="font-semibold">Filter slates</PopoverTitle>
+                <div className="text-muted-ink grid gap-1.5 text-xs font-medium">
+                  <span>Ownership</span>
+                  <Select value={scope} onValueChange={(value) => setScope(value ?? "all")}>
+                    <SelectTrigger className="w-full" aria-label="Slate ownership">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent align="start">
+                      <SelectItem value="all">All slates</SelectItem>
+                      <SelectItem value="owned">Owned by me</SelectItem>
+                      <SelectItem value="shared">Shared with me</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="text-muted-ink grid gap-1.5 text-xs font-medium">
+                  <span>Starred</span>
+                  <Select value={starred} onValueChange={(value) => setStarred(value ?? "all")}>
+                    <SelectTrigger className="w-full" aria-label="Starred filter">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent align="start">
+                      <SelectItem value="all">Starred and unstarred</SelectItem>
+                      <SelectItem value="true">Starred only</SelectItem>
+                      <SelectItem value="false">Not starred</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {query.data ? (
+            slates.length ? (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+                {slates.map((slate) => (
+                  <RecentSlateCard key={slate.id} slate={slate} />
+                ))}
+              </div>
+            ) : search || starred !== "all" || scope !== "all" ? (
+              <p className="border-line bg-paper-raised text-muted-ink rounded-sm border border-dashed px-4 py-6 text-center text-sm">
+                No slates match these filters.
+              </p>
+            ) : (
+              <div className="border-line bg-paper-raised rounded-sm border border-dashed px-4 py-8 text-center">
+                <p className="font-medium">No slates yet</p>
+                <p className="text-muted-ink mt-1 text-sm">
+                  Create a slate to start mapping ideas together.
+                </p>
+                <Button className="mt-4" onClick={create} disabled={createSlate.isPending}>
+                  {createSlate.isPending ? "Creating..." : "Create new slate"}
+                </Button>
+              </div>
+            )
+          ) : query.error ? (
+            <Alert variant="destructive">
+              <AlertTitle>Could not load slates</AlertTitle>
+              <AlertDescription>Check your connection and try again.</AlertDescription>
+              <Button variant="outline" size="sm" onClick={() => query.refetch()}>
+                Try again
+              </Button>
+            </Alert>
+          ) : null}
+
+          {query.data && hasNextPage && <div ref={endRef} className="h-4" aria-hidden="true" />}
+          {isFetchingNextPage && <Skeleton className="mt-3 h-24" />}
+          {query.isFetchNextPageError && (
+            <Alert variant="destructive" className="mt-3">
+              <AlertTitle>Could not load more slates</AlertTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fetchNextPage().catch(() => undefined)}
+              >
+                Try again
+              </Button>
+            </Alert>
+          )}
+        </section>
       </main>
     </>
   );

@@ -9,7 +9,6 @@ import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query
 import { type AxiosError, isAxiosError } from "axios";
 import type { FieldValues, Path, UseFormSetError } from "react-hook-form";
 import { toastManager } from "#/components/ui/toast";
-import { getCurrentUser } from "#/features/auth/current-user";
 import { api } from "#/lib/api";
 import type {
   EmailVerificationChallenge,
@@ -19,14 +18,23 @@ import type {
 
 export const authQueryOptions = queryOptions({
   queryKey: ["auth", "me"] as const,
-  // Use the request cookie during server rendering and the API cookie in the browser.
+  // The browser must perform this check so it can send the path-scoped refresh cookie.
   queryFn: async () => {
-    if (typeof window === "undefined") return getCurrentUser();
     try {
       const { data } = await api.get<{ user: AuthUser }>("/auth/me");
       return data.user;
-    } catch {
-      return null;
+    } catch (error) {
+      if (isAxiosError(error) && error.response?.status === 401) {
+        try {
+          await api.post("/auth/refresh");
+          const { data } = await api.get<{ user: AuthUser }>("/auth/me");
+          return data.user;
+        } catch (refreshError) {
+          if (isAxiosError(refreshError) && refreshError.response?.status === 401) return null;
+          throw refreshError;
+        }
+      }
+      throw error;
     }
   },
   staleTime: 5 * 60 * 1000,
@@ -110,6 +118,13 @@ export function useLogoutMutation() {
       // Remove private cached data after the API clears the browser session.
       queryClient.setQueryData(authQueryOptions.queryKey, null);
       queryClient.clear();
+    },
+    onError: (error) => {
+      toastManager.add({
+        type: "error",
+        title: "Could not log out",
+        description: error.response?.data?.message ?? "Please try again.",
+      });
     },
   });
 }

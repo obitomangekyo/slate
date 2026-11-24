@@ -2,12 +2,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { type LoginInput, LoginInputSchema } from "@slate/shared";
 import { useDebouncedCallback } from "@tanstack/react-pacer";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
-import { Google, Mail, WarningCircle } from "iconoir-react";
+import { GoogleCircle, Mail, WarningCircle } from "iconoir-react";
 import { REGEXP_ONLY_DIGITS_AND_CHARS } from "input-otp";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
-import SlateAppIcon from "#/assets/svgs/slate-app-icon.svg?react";
+import { AuthFormTransition } from "#/components/auth/auth-form-transition";
 import { PasswordInput } from "#/components/auth/password-input";
 import { Alert, AlertDescription } from "#/components/ui/alert";
 import { Button } from "#/components/ui/button";
@@ -33,6 +33,7 @@ const loginSearchSchema = z.object({
 });
 
 export const Route = createFileRoute("/_is_out/login")({
+  head: () => ({ meta: [{ title: "Log in · Slate" }] }),
   validateSearch: loginSearchSchema,
   beforeLoad: async ({ context }) => {
     // Signed-in users should go straight to the app instead of seeing the login form.
@@ -42,10 +43,10 @@ export const Route = createFileRoute("/_is_out/login")({
       throw redirect({ to: "/" });
     }
   },
-  component: LoginPage,
+  component: RouteComponent,
 });
 
-function LoginPage() {
+function RouteComponent() {
   // Keep form state and the verification challenge on the same page after a login attempt.
   const navigate = Route.useNavigate();
   const { redirect: redirectTo, error: oauthError } = Route.useSearch();
@@ -166,192 +167,169 @@ function LoginPage() {
 
   // Show either the password form or the code form based on the login response.
   return (
-    <main className="bg-paper text-ink flex min-h-screen flex-col items-center justify-center px-4 py-12">
-      <div className="w-full max-w-sm">
-        <div className="mb-6 flex items-center gap-2.5">
-          <div className="flex items-center text-xs leading-none">
-            <SlateAppIcon aria-hidden="true" className="h-[3em]" />
-            <span className="mr-3 ml-1 text-[2em] font-semibold tracking-tight">Slate</span>
-          </div>
-        </div>
-
-        <section className="border-line bg-paper-raised rounded-sm border p-6">
-          <header className="mb-6">
-            <h1 className="text-lg font-semibold tracking-tight">
-              {verification ? "Verify your email" : "Sign in to your workspace"}
-            </h1>
-            <p className="text-muted-ink mt-1 text-sm">
-              {verification ? (
-                <>
-                  Enter the six-character code exactly as it appears in the email sent to{" "}
-                  <span className="text-ink font-medium">{verification.email}</span>.
-                </>
-              ) : (
-                "Enter your room credentials or continue with Google."
-              )}
-            </p>
-          </header>
-
-          {oauthErrorMessage && (
-            <Alert variant="destructive" className="mb-5">
-              <WarningCircle strokeWidth={1.75} />
-              <AlertDescription>{oauthErrorMessage}</AlertDescription>
-            </Alert>
+    <AuthFormTransition>
+      <header className="auth-form-heading">
+        <h1 className="font-semibold tracking-tight">
+          {verification ? "Verify your email" : "Sign in to your workspace"}
+        </h1>
+        <p className="text-muted-ink">
+          {verification ? (
+            <>
+              Enter the six-character code exactly as it appears in the email sent to{" "}
+              <span className="text-ink font-medium">{verification.email}</span>.
+            </>
+          ) : (
+            "Enter your room credentials or continue with Google."
           )}
+        </p>
+      </header>
 
+      {oauthErrorMessage && (
+        <Alert variant="destructive" className="mb-5">
+          <WarningCircle strokeWidth={1.75} />
+          <AlertDescription>{oauthErrorMessage}</AlertDescription>
+        </Alert>
+      )}
+
+      <FieldGroup>
+        {!verification && (
+          <>
+            <Button type="button" variant="outline" className="w-full" onClick={handleGoogleSignIn}>
+              <GoogleCircle aria-hidden="true" />
+              Continue with Google
+            </Button>
+            <FieldSeparator>or</FieldSeparator>
+          </>
+        )}
+
+        <form onSubmit={handleSubmit(onSubmit)} noValidate>
           <FieldGroup>
-            {!verification && (
+            <Controller
+              name="email"
+              control={control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor={field.name}>Email</FieldLabel>
+                  <InputGroup>
+                    <InputGroupAddon align="inline-start" aria-hidden="true">
+                      <Mail strokeWidth={1.75} />
+                    </InputGroupAddon>
+                    <InputGroupInput
+                      {...field}
+                      id={field.name}
+                      type="email"
+                      autoComplete="email"
+                      aria-invalid={fieldState.invalid}
+                      disabled={Boolean(verification)}
+                      placeholder="you@studio.dev"
+                    />
+                  </InputGroup>
+                  {fieldState.error?.message && <FieldError>{fieldState.error.message}</FieldError>}
+                </Field>
+              )}
+            />
+
+            <Controller
+              name="password"
+              control={control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor={field.name}>Password</FieldLabel>
+                  <PasswordInput
+                    {...field}
+                    id={field.name}
+                    autoComplete="current-password"
+                    aria-invalid={fieldState.invalid}
+                    disabled={Boolean(verification)}
+                    placeholder="••••••••"
+                  />
+                  {fieldState.error?.message && <FieldError>{fieldState.error.message}</FieldError>}
+                </Field>
+              )}
+            />
+
+            {verification ? (
               <>
+                <Field>
+                  <FieldLabel htmlFor="login-verification-code">Email verification code</FieldLabel>
+                  <InputOTP
+                    id="login-verification-code"
+                    maxLength={6}
+                    pattern={REGEXP_ONLY_DIGITS_AND_CHARS}
+                    inputMode="text"
+                    autoComplete="one-time-code"
+                    value={code}
+                    onChange={handleVerificationChange}
+                    disabled={verifyEmailMutation.isPending}
+                    aria-label="Six-character alphanumeric verification code"
+                  >
+                    <InputOTPGroup>
+                      {verificationSlots.map((slot, index) => (
+                        <InputOTPSlot key={slot} index={index} />
+                      ))}
+                    </InputOTPGroup>
+                  </InputOTP>
+                  {verifyEmailMutation.isPending && (
+                    <output aria-live="polite" className="text-muted-ink text-xs">
+                      Verifying your email...
+                    </output>
+                  )}
+                </Field>
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="ghost"
                   className="w-full"
-                  onClick={handleGoogleSignIn}
+                  disabled={
+                    resendMutation.isPending || verifyEmailMutation.isPending || resendCooldown > 0
+                  }
+                  onClick={debouncedHandleResendCode}
                 >
-                  <Google aria-hidden="true" />
-                  Continue with Google
+                  {resendMutation.isPending
+                    ? "Sending another code..."
+                    : resendCooldown > 0
+                      ? `Resend code in ${resendCooldown}s`
+                      : "Resend code"}
                 </Button>
-                <FieldSeparator>or</FieldSeparator>
-              </>
-            )}
-
-            <form onSubmit={handleSubmit(onSubmit)} noValidate>
-              <FieldGroup>
-                <Controller
-                  name="email"
-                  control={control}
-                  render={({ field, fieldState }) => (
-                    <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel htmlFor={field.name}>Email</FieldLabel>
-                      <InputGroup>
-                        <InputGroupAddon align="inline-start" aria-hidden="true">
-                          <Mail strokeWidth={1.75} />
-                        </InputGroupAddon>
-                        <InputGroupInput
-                          {...field}
-                          id={field.name}
-                          type="email"
-                          autoComplete="email"
-                          aria-invalid={fieldState.invalid}
-                          disabled={Boolean(verification)}
-                          placeholder="you@studio.dev"
-                        />
-                      </InputGroup>
-                      {fieldState.error?.message && (
-                        <FieldError>{fieldState.error.message}</FieldError>
-                      )}
-                    </Field>
-                  )}
-                />
-
-                <Controller
-                  name="password"
-                  control={control}
-                  render={({ field, fieldState }) => (
-                    <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel htmlFor={field.name}>Password</FieldLabel>
-                      <PasswordInput
-                        {...field}
-                        id={field.name}
-                        autoComplete="current-password"
-                        aria-invalid={fieldState.invalid}
-                        disabled={Boolean(verification)}
-                        placeholder="••••••••"
-                      />
-                      {fieldState.error?.message && (
-                        <FieldError>{fieldState.error.message}</FieldError>
-                      )}
-                    </Field>
-                  )}
-                />
-
-                {verification ? (
-                  <>
-                    <Field>
-                      <FieldLabel htmlFor="login-verification-code">
-                        Email verification code
-                      </FieldLabel>
-                      <InputOTP
-                        id="login-verification-code"
-                        maxLength={6}
-                        pattern={REGEXP_ONLY_DIGITS_AND_CHARS}
-                        inputMode="text"
-                        autoComplete="one-time-code"
-                        value={code}
-                        onChange={handleVerificationChange}
-                        disabled={verifyEmailMutation.isPending}
-                        aria-label="Six-character alphanumeric verification code"
-                      >
-                        <InputOTPGroup>
-                          {verificationSlots.map((slot, index) => (
-                            <InputOTPSlot key={slot} index={index} />
-                          ))}
-                        </InputOTPGroup>
-                      </InputOTP>
-                      {verifyEmailMutation.isPending && (
-                        <output aria-live="polite" className="text-muted-ink text-xs">
-                          Verifying your email...
-                        </output>
-                      )}
-                    </Field>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="w-full"
-                      disabled={
-                        resendMutation.isPending ||
-                        verifyEmailMutation.isPending ||
-                        resendCooldown > 0
-                      }
-                      onClick={debouncedHandleResendCode}
-                    >
-                      {resendMutation.isPending
-                        ? "Sending another code..."
-                        : resendCooldown > 0
-                          ? `Resend code in ${resendCooldown}s`
-                          : "Resend code"}
-                    </Button>
-                    {resendMessage && (
-                      <output aria-live="polite" className="text-mineral text-center text-xs">
-                        {resendMessage}
-                      </output>
-                    )}
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="w-full"
-                      disabled={verifyEmailMutation.isPending}
-                      onClick={returnToSignIn}
-                    >
-                      Use different sign-in details
-                    </Button>
-                  </>
-                ) : (
-                  <Button
-                    type="submit"
-                    disabled={!isValid || loginMutation.isPending}
-                    className="w-full"
-                  >
-                    {loginMutation.isPending ? "Signing in..." : "Sign in"}
-                  </Button>
+                {resendMessage && (
+                  <output aria-live="polite" className="text-mineral text-center text-xs">
+                    {resendMessage}
+                  </output>
                 )}
-              </FieldGroup>
-            </form>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full"
+                  disabled={verifyEmailMutation.isPending}
+                  onClick={returnToSignIn}
+                >
+                  Use different sign-in details
+                </Button>
+              </>
+            ) : (
+              <Button
+                type="submit"
+                disabled={!isValid || loginMutation.isPending}
+                className="w-full"
+              >
+                {loginMutation.isPending ? "Signing in..." : "Sign in"}
+              </Button>
+            )}
           </FieldGroup>
-        </section>
+        </form>
+      </FieldGroup>
 
-        {!verification && (
-          <p className="text-muted-ink mt-5 text-center text-xs">
-            New to Slate?{" "}
-            <Link
-              to="/register"
-              className="text-mineral font-medium underline-offset-4 hover:underline"
-            >
-              Create an account
-            </Link>
-          </p>
-        )}
-      </div>
-    </main>
+      {!verification && (
+        <p className="text-muted-ink mt-5 text-center text-xs">
+          New to Slate?{" "}
+          <Link
+            to="/register"
+            {...(redirectTo && { search: { redirect: redirectTo } })}
+            className="text-mineral font-medium underline-offset-4 hover:underline"
+          >
+            Create an account
+          </Link>
+        </p>
+      )}
+    </AuthFormTransition>
   );
 }

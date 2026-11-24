@@ -1,6 +1,6 @@
 import type { SchemaOptions } from "mongoose";
 
-export const baseSchemaOptions: SchemaOptions = {
+export const baseSchemaOptions = {
   // Add createdAt and updatedAt automatically, and expose Mongo IDs as plain string IDs.
   timestamps: true,
   versionKey: false,
@@ -19,4 +19,4 @@ export const baseSchemaOptions: SchemaOptions = {
       return { ...output, id: String(_id) };
     },
   },
-};
+} satisfies SchemaOptions;

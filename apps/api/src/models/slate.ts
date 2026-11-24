@@ -1,5 +1,5 @@
-import { COLLABORATOR_ROLES, type CollaboratorRole, MAX_SLATE_TITLE_LENGTH } from "@slate/shared";
-import { model, Schema } from "mongoose";
+import { COLLABORATOR_ROLES, MAX_SLATE_TITLE_LENGTH } from "@slate/shared";
+import { type InferSchemaType, model, Schema } from "mongoose";
 import { baseSchemaOptions } from "#/models/__base";
 
 // Store each collaborator's permission beside their user ID on the slate.
@@ -11,7 +11,7 @@ const collaboratorSchema = new Schema(
   { _id: false },
 );
 
-// A slate is the board itself plus its owner, favorite state, and collaborators.
+// A slate is the board itself plus its owner and collaborators.
 const slateSchema = new Schema(
   {
     // New boards start with a useful title until the owner chooses another one.
@@ -24,16 +24,12 @@ const slateSchema = new Schema(
     },
     // Owner IDs come from authenticated users and are indexed for their slate list.
     ownerId: { type: String, required: true, index: true },
-    isFavorite: { type: Boolean, default: false, required: true },
+    // New slates can be opened by link until their owner switches them to private.
+    isPublic: { type: Boolean, default: true, required: true },
     collaborators: { type: [collaboratorSchema], default: [] },
   },
   baseSchemaOptions,
 );
 
-export type SlateDocument = {
-  title: string;
-  ownerId: string;
-  isFavorite: boolean;
-  collaborators: Array<{ userId: string; role: CollaboratorRole }>;
-};
+export type SlateDocument = InferSchemaType<typeof slateSchema>;
 export const SlateModel = model<SlateDocument>("Slate", slateSchema);

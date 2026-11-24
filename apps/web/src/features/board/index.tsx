@@ -37,7 +37,7 @@ export function Board() {
 
   return (
     // The outer box: full window, nothing spills out.
-    <main className="relative h-screen w-screen touch-none overflow-hidden select-none">
+    <div className="relative h-full w-full touch-none overflow-hidden select-none">
       {/* The viewport: the box that listens for all the dragging and pinching. */}
       <div ref={boardViewportRef} className="relative size-full">
         {/* The background dots. Purely decoration, so screen readers skip it. */}
@@ -51,6 +51,6 @@ export function Board() {
           className="pointer-events-none absolute top-0 left-0 origin-top-left"
         />
       </div>
-    </main>
+    </div>
   );
 }

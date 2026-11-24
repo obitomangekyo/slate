@@ -1,10 +1,11 @@
 import { createHash, randomBytes } from "node:crypto";
 import { LoginInputSchema, RegisterInputSchema } from "@slate/shared";
 import { type CookieOptions, Router } from "express";
+import { z } from "zod";
 import { env } from "#/env";
 import { clearAuthCookies, REFRESH_COOKIE_NAME, setAuthCookies } from "#/lib/auth";
-import { sendGeneralError, sendZodFieldErrors } from "#/lib/httpErrors";
 import { requireAuth } from "#/middleware/auth";
+import { validateRequest } from "#/middleware/validateRequest";
 import { authenticateGoogle } from "#/services/auth/google";
 import {
   createSession,
@@ -19,6 +20,13 @@ import {
 } from "#/services/auth/verification";
 
 export const authRouter: Router = Router();
+
+// Verification codes have exactly six letters or numbers; schemas reject malformed JSON early.
+const VerifyEmailBodySchema = z.object({
+  challengeId: z.string().min(1),
+  code: z.string().regex(/^[A-Za-z0-9]{6}$/, "Enter the six-character verification code."),
+});
+const ResendCodeBodySchema = z.object({ challengeId: z.string().min(1) });
 
 // Start Google's sign-in flow and store one-time values in browser-only cookies.
 authRouter.get("/google", (_req, res) => {
@@ -53,78 +61,116 @@ authRouter.get("/google", (_req, res) => {
 
 // Google returns here after sign-in; verify the callback before creating our session.
 authRouter.get("/google/callback", async (req, res) => {
-  const code = typeof req.query.code === "string" ? req.query.code : null;
-  const state = typeof req.query.state === "string" ? req.query.state : null;
-  const storedState = req.cookies?.google_oauth_state as string | undefined;
-  const codeVerifier = req.cookies?.google_code_verifier as string | undefined;
+  const { code, state, error: providerError } = req.query;
+
+  const storedState = req.cookies?.google_oauth_state;
+  const codeVerifier = req.cookies?.google_code_verifier;
+
+  const redirectToLogin = (error: string) => {
+    const url = new URL("/login", env.WEB_APP_URL);
+    url.searchParams.set("error", error);
+
+    return res.redirect(url.toString());
+  };
 
   // These one-time cookies should not survive the callback, whether it succeeds or fails.
   res.clearCookie("google_oauth_state", { path: "/api/auth/google" });
   res.clearCookie("google_code_verifier", { path: "/api/auth/google" });
 
-  if (!code || !state || !storedState || state !== storedState || !codeVerifier) {
-    res.redirect(`${env.WEB_APP_URL}/login?error=oauth_state_mismatch`);
-    return;
+  // Validate OAuth state before processing either a successful or failed response.
+  if (
+    typeof state !== "string" ||
+    !state ||
+    typeof storedState !== "string" ||
+    !storedState ||
+    state !== storedState
+  ) {
+    return redirectToLogin("oauth_state_mismatch");
+  }
+
+  // Google can return an error instead of an authorization code.
+  if (providerError !== undefined) {
+    return redirectToLogin(
+      providerError === "access_denied" ? "oauth_access_denied" : "oauth_failed",
+    );
+  }
+
+  if (typeof code !== "string" || !code || typeof codeVerifier !== "string" || !codeVerifier) {
+    return redirectToLogin("oauth_invalid_callback");
   }
 
   const result = await authenticateGoogle(code, codeVerifier);
+
   if ("error" in result) {
-    res.redirect(`${env.WEB_APP_URL}/login?error=${result.error}`);
-    return;
+    return redirectToLogin(result.error);
   }
 
   setAuthCookies(res, result.session.accessToken, result.session.refreshToken);
+
   res.redirect(env.WEB_APP_URL);
 });
 
 // Create a pending account and email its one-time verification code.
-authRouter.post("/register", async (req, res) => {
-  const parsed = RegisterInputSchema.safeParse(req.body);
-  if (!parsed.success) {
-    sendZodFieldErrors(res, parsed.error);
-    return;
-  }
-
-  const verification = await registerWithEmail(parsed.data);
-  res.status(201).json({ verification });
-});
+authRouter.post(
+  "/register",
+  validateRequest(
+    z.object({ body: RegisterInputSchema }),
+    (req) => ({ body: req.body }),
+    async (_req, res, { body }) => {
+      // Middleware has checked and normalized the registration form before this route runs.
+      const verification = await registerWithEmail(body);
+      res.status(201).json({ verification });
+    },
+  ),
+);
 
 // Accept a valid code once, then sign the newly verified user in.
-authRouter.post("/verify-email", async (req, res) => {
-  // Read untrusted JSON as unknown strings before passing values to the verifier.
-  const challengeId = typeof req.body?.challengeId === "string" ? req.body.challengeId : "";
-  const code = typeof req.body?.code === "string" ? req.body.code : "";
-  if (!challengeId || !/^[A-Za-z0-9]{6}$/.test(code)) {
-    sendGeneralError(res, 400, "Invalid verification code");
-    return;
-  }
+authRouter.post(
+  "/verify-email",
+  validateRequest(
+    z.object({ body: VerifyEmailBodySchema }),
+    (req) => ({ body: req.body }),
+    async (_req, res, { body }) => {
+      // The code and challenge ID are already checked by the middleware.
+      const { challengeId, code } = body;
 
-  // Verification creates a normal signed-in session as soon as the code is accepted.
-  const user = await verifyEmailCode(challengeId, code);
-  const session = await createSession(user);
-  setAuthCookies(res, session.accessToken, session.refreshToken);
-  res.json({ user: session.authUser });
-});
+      // Verification creates a normal signed-in session as soon as the code is accepted.
+      const user = await verifyEmailCode(challengeId, code);
+      const session = await createSession(user);
+      setAuthCookies(res, session.accessToken, session.refreshToken);
+      res.json({ user: session.authUser });
+    },
+  ),
+);
 
 // Send a replacement code only when the stored resend timer permits it.
-authRouter.post("/verify-email/resend", async (req, res) => {
-  const challengeId = typeof req.body?.challengeId === "string" ? req.body.challengeId : "";
-  const result = await resendVerificationCode(challengeId);
-  res.json(result);
-});
+authRouter.post(
+  "/verify-email/resend",
+  validateRequest(
+    z.object({ body: ResendCodeBodySchema }),
+    (req) => ({ body: req.body }),
+    async (_req, res, { body }) => {
+      // Only a checked challenge ID reaches the resend service.
+      const result = await resendVerificationCode(body.challengeId);
+      res.json(result);
+    },
+  ),
+);
 
 // Check the submitted email and password, then issue the browser session cookies.
-authRouter.post("/login", async (req, res) => {
-  const parsed = LoginInputSchema.safeParse(req.body);
-  if (!parsed.success) {
-    sendZodFieldErrors(res, parsed.error);
-    return;
-  }
-
-  const session = await loginWithPassword(parsed.data);
-  setAuthCookies(res, session.accessToken, session.refreshToken);
-  res.json({ user: session.authUser });
-});
+authRouter.post(
+  "/login",
+  validateRequest(
+    z.object({ body: LoginInputSchema }),
+    (req) => ({ body: req.body }),
+    async (_req, res, { body }) => {
+      // Middleware checks the email and password before the session service receives them.
+      const session = await loginWithPassword(body);
+      setAuthCookies(res, session.accessToken, session.refreshToken);
+      res.json({ user: session.authUser });
+    },
+  ),
+);
 
 // Replace an expiring access token using the longer-lived refresh cookie.
 authRouter.post("/refresh", async (req, res) => {

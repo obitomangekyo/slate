@@ -10,14 +10,20 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as Is_inRouteImport } from './routes/_is_in'
+import { Route as Is_outRouteImport } from './routes/_is_out'
 import { Route as Is_inIndexRouteImport } from './routes/_is_in/index'
 import { Route as Is_outLoginRouteImport } from './routes/_is_out/login'
 import { Route as Is_outRegisterRouteImport } from './routes/_is_out/register'
+import { Route as SSlateIdRouteImport } from './routes/s/$slateId'
 import { Route as Is_inSIndexRouteImport } from './routes/_is_in/s/index'
-import { Route as Is_inSSlateIdIndexRouteImport } from './routes/_is_in/s/$slateId/index'
+import { Route as Is_outInvitationsTokenRouteImport } from './routes/_is_out/invitations/$token'
 
 const Is_inRoute = Is_inRouteImport.update({
   id: '/_is_in',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const Is_outRoute = Is_outRouteImport.update({
+  id: '/_is_out',
   getParentRoute: () => rootRouteImport,
 } as any)
 const Is_inIndexRoute = Is_inIndexRouteImport.update({
@@ -26,13 +32,18 @@ const Is_inIndexRoute = Is_inIndexRouteImport.update({
   getParentRoute: () => Is_inRoute,
 } as any)
 const Is_outLoginRoute = Is_outLoginRouteImport.update({
-  id: '/_is_out/login',
+  id: '/login',
   path: '/login',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => Is_outRoute,
 } as any)
 const Is_outRegisterRoute = Is_outRegisterRouteImport.update({
-  id: '/_is_out/register',
+  id: '/register',
   path: '/register',
+  getParentRoute: () => Is_outRoute,
+} as any)
+const SSlateIdRoute = SSlateIdRouteImport.update({
+  id: '/s/$slateId',
+  path: '/s/$slateId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const Is_inSIndexRoute = Is_inSIndexRouteImport.update({
@@ -40,54 +51,62 @@ const Is_inSIndexRoute = Is_inSIndexRouteImport.update({
   path: '/s/',
   getParentRoute: () => Is_inRoute,
 } as any)
-const Is_inSSlateIdIndexRoute = Is_inSSlateIdIndexRouteImport.update({
-  id: '/s/$slateId/',
-  path: '/s/$slateId/',
-  getParentRoute: () => Is_inRoute,
+const Is_outInvitationsTokenRoute = Is_outInvitationsTokenRouteImport.update({
+  id: '/invitations/$token',
+  path: '/invitations/$token',
+  getParentRoute: () => Is_outRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof Is_inIndexRoute
   '/login': typeof Is_outLoginRoute
   '/register': typeof Is_outRegisterRoute
+  '/s/$slateId': typeof SSlateIdRoute
+  '/invitations/$token': typeof Is_outInvitationsTokenRoute
   '/s/': typeof Is_inSIndexRoute
-  '/s/$slateId/': typeof Is_inSSlateIdIndexRoute
 }
 export interface FileRoutesByTo {
+  '/': typeof Is_inIndexRoute
   '/login': typeof Is_outLoginRoute
   '/register': typeof Is_outRegisterRoute
-  '/': typeof Is_inIndexRoute
+  '/s/$slateId': typeof SSlateIdRoute
+  '/invitations/$token': typeof Is_outInvitationsTokenRoute
   '/s': typeof Is_inSIndexRoute
-  '/s/$slateId': typeof Is_inSSlateIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_is_in': typeof Is_inRouteWithChildren
+  '/_is_out': typeof Is_outRouteWithChildren
   '/_is_out/login': typeof Is_outLoginRoute
   '/_is_out/register': typeof Is_outRegisterRoute
+  '/s/$slateId': typeof SSlateIdRoute
   '/_is_in/': typeof Is_inIndexRoute
+  '/_is_out/invitations/$token': typeof Is_outInvitationsTokenRoute
   '/_is_in/s/': typeof Is_inSIndexRoute
-  '/_is_in/s/$slateId/': typeof Is_inSSlateIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/register' | '/s/' | '/s/$slateId/'
+  fullPaths:
+    '/' | '/login' | '/register' | '/s/$slateId' | '/invitations/$token' | '/s/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/login' | '/register' | '/' | '/s' | '/s/$slateId'
+  to:
+    '/' | '/login' | '/register' | '/s/$slateId' | '/invitations/$token' | '/s'
   id:
     | '__root__'
     | '/_is_in'
+    | '/_is_out'
     | '/_is_out/login'
     | '/_is_out/register'
+    | '/s/$slateId'
     | '/_is_in/'
+    | '/_is_out/invitations/$token'
     | '/_is_in/s/'
-    | '/_is_in/s/$slateId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   Is_inRoute: typeof Is_inRouteWithChildren
-  Is_outLoginRoute: typeof Is_outLoginRoute
-  Is_outRegisterRoute: typeof Is_outRegisterRoute
+  Is_outRoute: typeof Is_outRouteWithChildren
+  SSlateIdRoute: typeof SSlateIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -97,6 +116,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof Is_inRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_is_out': {
+      id: '/_is_out'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof Is_outRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_is_in/': {
@@ -111,13 +137,20 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof Is_outLoginRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof Is_outRoute
     }
     '/_is_out/register': {
       id: '/_is_out/register'
       path: '/register'
       fullPath: '/register'
       preLoaderRoute: typeof Is_outRegisterRouteImport
+      parentRoute: typeof Is_outRoute
+    }
+    '/s/$slateId': {
+      id: '/s/$slateId'
+      path: '/s/$slateId'
+      fullPath: '/s/$slateId'
+      preLoaderRoute: typeof SSlateIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_is_in/s/': {
@@ -127,12 +160,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof Is_inSIndexRouteImport
       parentRoute: typeof Is_inRoute
     }
-    '/_is_in/s/$slateId/': {
-      id: '/_is_in/s/$slateId/'
-      path: '/s/$slateId'
-      fullPath: '/s/$slateId/'
-      preLoaderRoute: typeof Is_inSSlateIdIndexRouteImport
-      parentRoute: typeof Is_inRoute
+    '/_is_out/invitations/$token': {
+      id: '/_is_out/invitations/$token'
+      path: '/invitations/$token'
+      fullPath: '/invitations/$token'
+      preLoaderRoute: typeof Is_outInvitationsTokenRouteImport
+      parentRoute: typeof Is_outRoute
     }
   }
 }
@@ -140,21 +173,34 @@ declare module '@tanstack/react-router' {
 interface Is_inRouteChildren {
   Is_inIndexRoute: typeof Is_inIndexRoute
   Is_inSIndexRoute: typeof Is_inSIndexRoute
-  Is_inSSlateIdIndexRoute: typeof Is_inSSlateIdIndexRoute
 }
 
 const Is_inRouteChildren: Is_inRouteChildren = {
   Is_inIndexRoute: Is_inIndexRoute,
   Is_inSIndexRoute: Is_inSIndexRoute,
-  Is_inSSlateIdIndexRoute: Is_inSSlateIdIndexRoute,
 }
 
 const Is_inRouteWithChildren = Is_inRoute._addFileChildren(Is_inRouteChildren)
 
-const rootRouteChildren: RootRouteChildren = {
-  Is_inRoute: Is_inRouteWithChildren,
+interface Is_outRouteChildren {
+  Is_outLoginRoute: typeof Is_outLoginRoute
+  Is_outRegisterRoute: typeof Is_outRegisterRoute
+  Is_outInvitationsTokenRoute: typeof Is_outInvitationsTokenRoute
+}
+
+const Is_outRouteChildren: Is_outRouteChildren = {
   Is_outLoginRoute: Is_outLoginRoute,
   Is_outRegisterRoute: Is_outRegisterRoute,
+  Is_outInvitationsTokenRoute: Is_outInvitationsTokenRoute,
+}
+
+const Is_outRouteWithChildren =
+  Is_outRoute._addFileChildren(Is_outRouteChildren)
+
+const rootRouteChildren: RootRouteChildren = {
+  Is_inRoute: Is_inRouteWithChildren,
+  Is_outRoute: Is_outRouteWithChildren,
+  SSlateIdRoute: SSlateIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

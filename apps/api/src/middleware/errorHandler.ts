@@ -16,10 +16,10 @@ export function errorHandler(error: unknown, _req: Request, res: Response, next:
     // Expected application errors already include the status and safe message to return.
     if (error.responseOptions.clearAuthCookies) clearAuthCookies(res);
     sendGeneralError(res, error.status, error.message, {
-      ...(error.responseOptions.code ? { code: error.responseOptions.code } : {}),
-      ...(error.responseOptions.verification
-        ? { verification: error.responseOptions.verification }
-        : {}),
+      ...(error.responseOptions.code && { code: error.responseOptions.code }),
+      ...(error.responseOptions.verification && {
+        verification: error.responseOptions.verification,
+      }),
     });
     return;
   }

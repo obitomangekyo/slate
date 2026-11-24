@@ -26,7 +26,7 @@ function pointOnRing(angleDegrees: number): [number, number] {
   return [CENTER + RADIUS * Math.cos(radians), CENTER + RADIUS * Math.sin(radians)];
 }
 
-function segmentPath(index: number): string {
+function segmentPath(index: number) {
   // Each segment is an arc centered on its place in the circle with a small visible gap.
   const dashSpacing = 360 / SEGMENT_COUNT;
   const dashCenter = RING.firstDashCenterDegrees - index * dashSpacing;
@@ -39,7 +39,7 @@ function segmentPath(index: number): string {
   return `M ${startX} ${startY} A ${RADIUS} ${RADIUS} 0 0 0 ${endX} ${endY}`;
 }
 
-function colorForScore(score: number | null): string {
+function colorForScore(score: number | null) {
   // Match the ring color to the same five-level score shown beside the password field.
   if (score === null) return "var(--color-line)";
   if (score <= 1) return "var(--color-clay)";

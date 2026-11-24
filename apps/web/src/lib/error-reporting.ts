@@ -23,7 +23,7 @@ export function reportError(error: unknown, meta?: ErrorMeta) {
   Sentry.captureException(error, meta ? { extra: meta } : undefined);
 }
 
-export function normalizeError(error: unknown): Error {
+export function normalizeError(error: unknown) {
   // React boundaries expect an Error even when a loader threw a string or plain object.
   if (error instanceof Error) return error;
   if (typeof error === "string") return new Error(error);

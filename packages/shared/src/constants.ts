@@ -20,6 +20,8 @@ export const MIN_NOTE_DIMENSIONS = {
 export const MAX_NOTE_CONTENT_LENGTH = 2000;
 export const MAX_EDGE_LABEL_LENGTH = 120;
 export const MAX_SLATE_TITLE_LENGTH = 100;
+// A saved title needs at least one visible character after trimming spaces.
+export const MIN_SLATE_TITLE_LENGTH = 1;
 
 // Choose cursor colors from this shared palette to keep them legible on the board.
 export const CURSOR_COLORS = [

@@ -28,3 +28,20 @@ export async function sendVerificationCode(email: string, code: string) {
     html: verificationTemplate({ email, code }),
   });
 }
+
+export async function sendSlateInvitation(
+  email: string,
+  slateTitle: string,
+  invitationUrl: string,
+) {
+  // Escape values that are inserted into HTML so titles and links stay inert text.
+  const safeTitle = Handlebars.escapeExpression(slateTitle);
+  const safeUrl = Handlebars.escapeExpression(invitationUrl);
+  await transporter.sendMail({
+    from: { name: "Slate", address: env.MAIL_USER ?? "" },
+    to: email,
+    subject: `Invitation to ${slateTitle}`,
+    text: `You were invited to collaborate on ${slateTitle}. Open this link to review the invitation: ${invitationUrl}. The link expires in seven days.`,
+    html: `<p>You were invited to collaborate on <strong>${safeTitle}</strong>.</p><p><a href="${safeUrl}">Review invitation</a></p><p>This link expires in seven days.</p>`,
+  });
+}

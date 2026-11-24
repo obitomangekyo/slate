@@ -49,4 +49,4 @@ const nodeSchema = new Schema(
 nodeSchema.index({ slateId: 1, updatedAt: -1 });
 
 export type CanvasNodeDocument = InferSchemaType<typeof nodeSchema>;
-export const CanvasNodeModel = model("CanvasNode", nodeSchema);
+export const CanvasNodeModel = model<CanvasNodeDocument>("CanvasNode", nodeSchema);

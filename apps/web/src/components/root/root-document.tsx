@@ -33,7 +33,7 @@ export function RootDocument({ children }: { children: ReactNode }) {
       <head>
         <HeadContent />
       </head>
-      <body className="bg-paper text-ink min-h-screen">
+      <body className="bg-paper text-ink">
         {children}
         <TanStackDevtools plugins={devtoolsPlugins} />
         <Scripts />

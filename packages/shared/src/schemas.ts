@@ -4,6 +4,7 @@ import {
   MAX_NOTE_CONTENT_LENGTH,
   MAX_SLATE_TITLE_LENGTH,
   MIN_NOTE_DIMENSIONS,
+  MIN_SLATE_TITLE_LENGTH,
   NODE_TONES,
 } from "#/constants";
 
@@ -38,7 +39,7 @@ export const CanvasNodeSchema = z.object({
   tone: NodeToneSchema,
   votes: z.array(z.string()),
   version: z.number().int().nonnegative(),
-  updatedAt: z.string().datetime(),
+  updatedAt: z.iso.datetime(),
 });
 
 export type CanvasNode = z.infer<typeof CanvasNodeSchema>;
@@ -58,8 +59,57 @@ export type CanvasEdge = z.infer<typeof CanvasEdgeSchema>;
 export const SlateMetaSchema = z.object({
   id: z.string().min(1),
   title: z.string().min(1).max(MAX_SLATE_TITLE_LENGTH),
-  isFavorite: z.boolean(),
-  updatedAt: z.string().datetime(),
+  starred: z.boolean(),
+  isPublic: z.boolean(),
+  updatedAt: z.iso.datetime(),
 });
 
 export type SlateMeta = z.infer<typeof SlateMetaSchema>;
+
+export const CreateSlateInputSchema = z.object({
+  title: z.string().trim().min(1).max(MAX_SLATE_TITLE_LENGTH).optional(),
+  isPublic: z.boolean().optional(),
+});
+
+export type CreateSlateInput = z.infer<typeof CreateSlateInputSchema>;
+
+export const UpdateSlateInputSchema = z
+  .object({
+    title: z.string().trim().min(MIN_SLATE_TITLE_LENGTH).max(MAX_SLATE_TITLE_LENGTH).optional(),
+    isPublic: z.boolean().optional(),
+  })
+  .refine((input) => Object.keys(input).length > 0, "Change at least one slate setting.");
+export type UpdateSlateInput = z.infer<typeof UpdateSlateInputSchema>;
+
+export const SlateDetailSchema = SlateMetaSchema.extend({
+  ownerId: z.string().min(1),
+  collaborators: z.array(
+    z.object({ userId: z.string().min(1), role: z.enum(["editor", "viewer"]) }),
+  ),
+  nodes: z.array(CanvasNodeSchema),
+  edges: z.array(CanvasEdgeSchema),
+});
+
+export type SlateDetail = z.infer<typeof SlateDetailSchema>;
+
+export const SlateSummarySchema = SlateMetaSchema.extend({
+  createdAt: z.iso.datetime(),
+  nodeCount: z.number().int().nonnegative(),
+  previewNodes: z.array(
+    z.object({
+      content: z.string(),
+      position: PointSchema,
+      dimensions: DimensionsSchema,
+      tone: NodeToneSchema,
+    }),
+  ),
+});
+
+export type SlateSummary = z.infer<typeof SlateSummarySchema>;
+
+export const SlatePageSchema = z.object({
+  slates: z.array(SlateSummarySchema),
+  nextCursor: z.string().nullable(),
+});
+
+export type SlatePage = z.infer<typeof SlatePageSchema>;

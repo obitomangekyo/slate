@@ -22,7 +22,7 @@ type PaintDotGridOptions = {
 // Normal "remainder" maths gives negative answers for negative numbers
 // (-3 % 20 is -3). We want the answer to always land between 0 and the divisor,
 // so -3 becomes 17. This keeps the grid wrapping smoothly when dragged left or up.
-function positiveRemainder(value: number, divisor: number): number {
+function positiveRemainder(value: number, divisor: number) {
   return ((value % divisor) + divisor) % divisor;
 }
 

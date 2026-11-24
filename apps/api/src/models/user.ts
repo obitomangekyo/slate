@@ -1,5 +1,5 @@
 import { CURSOR_COLORS, MAX_USER_NAME_LENGTH } from "@slate/shared";
-import { model, Schema } from "mongoose";
+import { type InferSchemaType, model, Schema } from "mongoose";
 import { baseSchemaOptions } from "#/models/__base";
 
 // Keep account details and authentication secrets in one document per email address.
@@ -54,19 +54,5 @@ const userSchema = new Schema(
   baseSchemaOptions,
 );
 
-export type UserDocument = {
-  email: string;
-  emailVerifiedAt: Date | null;
-  emailVerificationChallengeId: string | null;
-  emailVerificationCodeHash: string | null;
-  emailVerificationExpiresAt: Date | null;
-  emailVerificationAttempts: number;
-  emailVerificationAttemptsResetAt: Date | null;
-  emailVerificationResendAt: Date | null;
-  name: string;
-  color: (typeof CURSOR_COLORS)[number];
-  passwordHash?: string;
-  refreshTokenHash: string | null;
-  googleId?: string;
-};
+export type UserDocument = InferSchemaType<typeof userSchema>;
 export const UserModel = model<UserDocument>("User", userSchema);

@@ -18,14 +18,14 @@ export function generateStructuredData() {
     "@context": "https://schema.org",
     "@graph": [
       {
-        ...(websiteId ? { "@id": websiteId, url: SEO.siteUrl } : {}),
+        ...(websiteId && { "@id": websiteId, url: SEO.siteUrl }),
         "@type": "WebSite",
         name: SEO.siteName,
         description: SEO.description,
         inLanguage: "en",
       },
       {
-        ...(applicationId ? { "@id": applicationId, url: SEO.siteUrl } : {}),
+        ...(applicationId && { "@id": applicationId, url: SEO.siteUrl }),
         "@type": "WebApplication",
         name: SEO.siteName,
         applicationCategory: "BusinessApplication",
@@ -40,7 +40,7 @@ export function generateStructuredData() {
           "Dot voting",
           "Connections between ideas",
         ],
-        ...(websiteId ? { isPartOf: { "@id": websiteId } } : {}),
+        ...(websiteId && { isPartOf: { "@id": websiteId } }),
       },
     ],
   };

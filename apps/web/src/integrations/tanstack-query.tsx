@@ -1,10 +1,6 @@
 import { QueryClient } from "@tanstack/react-query";
 
-interface QueryContext {
-  queryClient: QueryClient;
-}
-
-export function getContext(): QueryContext {
+export function getContext() {
   // Create one cache for this router context so users do not share cached account data.
   const queryClient = new QueryClient({
     defaultOptions: {

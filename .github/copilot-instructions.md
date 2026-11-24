@@ -38,6 +38,8 @@ The API is organized into `routes`, `services`, `middleware`, `models`, and `lib
 
 Board data is modeled around slates, nodes, and edges. Shared Zod schemas and constants in `packages/shared/src` define the cross-app canvas contracts. Mongoose equivalents in `apps/api/src/models` add persistence and timestamps. The web board currently lives under `apps/web/src/features/board`.
 
+The Slates REST vertical slice uses shared `CreateSlateInput`, `UpdateSlateInput`, `SlateDetail`, and `SlateSummary` contracts. API routes in `apps/api/src/routes/slates.ts` require authentication and centralized slate access roles, and deleting a slate also deletes its nodes and edges. The web uses `apps/web/src/lib/slates.ts` for query options and mutations: list/detail keys stay under `["slates"]`, create prepends the new record, and starred-state mutations update the cache optimistically with rollback and settlement invalidation.
+
 CI runs `pnpm lint:ci`, `pnpm typecheck`, and `pnpm build`. Deployment builds and deploys the web and API as separate Fly.io apps after successful CI on `dev` or `staging`.
 
 ## Code conventions

@@ -16,7 +16,7 @@ export function RootPending() {
         className="border-line bg-paper-raised flex items-center gap-3 rounded-sm border px-5 py-4 shadow-sm"
       >
         <span className="bg-mineral size-2.5 animate-pulse rounded-full" />
-        <span className="text-sm font-medium">Setting the table…</span>
+        <span className="text-sm font-medium">Setting the table...</span>
       </output>
     </main>
   );

@@ -1,10 +1,9 @@
 import { type AxiosError, create, type InternalAxiosRequestConfig } from "axios";
-import { env } from "#/env";
-
-export const API_SERVER_URL = env.VITE_API_URL;
 
 export const api = create({
-  // The web server proxies this path to the API, and cookies carry the session.
+  // This is a relative URL: the browser calls the web app's own `/api` path,
+  // and the web server forwards that request to the separate API server. This
+  // avoids hard-coding a server address into every browser request. Cookies carry the session.
   baseURL: "/api",
   withCredentials: true,
   headers: {
