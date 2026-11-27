@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { formatDistanceToNow } from "date-fns";
 import { NavArrowRight, Star } from "iconoir-react";
 import type { CSSProperties } from "react";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { Button } from "#/components/ui/button";
 import { useToggleStarredMutation } from "#/lib/slates";
 
@@ -54,6 +54,10 @@ function SlatePreview({ slate }: { slate: SlateSummary }) {
 export function RecentSlateCard({ slate }: { slate: SlateSummary }) {
   const starMutation = useToggleStarredMutation();
   const slateRouteParams = useMemo(() => ({ slateId: slate.id }), [slate.id]);
+  const toggleStar = useCallback(
+    async () => await starMutation.mutateAsync({ slateId: slate.id, starred: !slate.starred }),
+    [slate.id, slate.starred, starMutation],
+  );
 
   return (
     <article className="group border-line bg-paper-raised hover:border-mineral relative flex min-h-56 flex-col rounded-sm border transition-colors">
@@ -86,7 +90,7 @@ export function RecentSlateCard({ slate }: { slate: SlateSummary }) {
         aria-label={slate.starred ? "Remove from starred" : "Add to starred"}
         aria-pressed={slate.starred}
         disabled={starMutation.isPending}
-        onClick={() => starMutation.mutate({ slateId: slate.id, starred: !slate.starred })}
+        onClick={toggleStar}
         className="bg-paper-raised/90 absolute top-2 right-2"
       >
         <Star className={slate.starred ? "fill-citron text-citron" : ""} />

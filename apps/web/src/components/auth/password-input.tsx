@@ -12,8 +12,8 @@ import {
 const REVEAL_DURATION_MS = 5_000;
 
 type Props = Omit<ComponentProps<"input">, "type"> & {
-  strengthScore?: number | null;
-  strengthLabel?: string | null;
+  strengthScore?: number;
+  strengthLabel?: string;
 };
 
 function PasswordInput({ strengthScore, strengthLabel, ...inputProps }: Props) {
@@ -42,7 +42,10 @@ function PasswordInput({ strengthScore, strengthLabel, ...inputProps }: Props) {
     <InputGroup>
       <InputGroupAddon align="inline-start" aria-hidden={hasStrength ? undefined : true}>
         {hasStrength ? (
-          <PasswordStrengthRing score={strengthScore ?? null} label={strengthLabel ?? null} />
+          <PasswordStrengthRing
+            {...(strengthScore !== undefined && { score: strengthScore })}
+            {...(strengthLabel !== undefined && { label: strengthLabel })}
+          />
         ) : (
           <Lock strokeWidth={1.75} />
         )}

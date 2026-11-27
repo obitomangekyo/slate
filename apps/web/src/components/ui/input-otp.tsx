@@ -61,7 +61,7 @@ function InputOTPSlot({
       {char}
       {hasFakeCaret && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <div className="animate-caret-blink bg-foreground h-4 w-px duration-1000" />
+          <div className="animate-caret-blink bg-ink h-4 w-px duration-1000" />
         </div>
       )}
     </div>
@@ -73,7 +73,7 @@ function InputOTPSeparator({ ...props }: ComponentProps<"div">) {
   return (
     <div
       data-slot="input-otp-separator"
-      className="text-muted-ink flex items-center [&_svg:not([class*='size-'])]:size-3"
+      className="text-muted flex items-center [&_svg:not([class*='size-'])]:size-3"
       {...props}
     >
       <Minus />

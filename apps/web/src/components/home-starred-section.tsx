@@ -17,8 +17,10 @@ const carouselOptions = { align: "start", containScroll: "trimSnaps" } as const;
 
 export function HomeStarredSection() {
   const query = useSlatePagesQuery({ starred: true });
-  const { fetchNextPage, hasNextPage, isFetchingNextPage } = query;
+  const { fetchNextPage, hasNextPage, isFetchingNextPage, refetch } = query;
   const [carouselApi, setCarouselApi] = useState<CarouselApi>();
+  const refetchSlates = useCallback(() => refetch(), [refetch]);
+  const retryNextPage = useCallback(() => fetchNextPage(), [fetchNextPage]);
   const slates = useMemo(
     () => query.data?.pages.flatMap((page) => page.slates) ?? [],
     [query.data],
@@ -32,7 +34,7 @@ export function HomeStarredSection() {
     const loadNearEnd = () => {
       const lastNearEnd = carouselApi.scrollSnapList().length - 3;
       if (carouselApi.selectedScrollSnap() >= lastNearEnd && hasNextPage && !isFetchingNextPage) {
-        fetchNextPage().catch(() => undefined);
+        fetchNextPage();
       }
     };
 
@@ -77,7 +79,7 @@ export function HomeStarredSection() {
             </CarouselContent>
           </Carousel>
         ) : (
-          <p className="border-line bg-paper-raised text-muted-ink rounded-sm border border-dashed px-4 py-3 text-sm">
+          <p className="border-line bg-paper-raised text-muted rounded-sm border border-dashed px-4 py-3 text-sm">
             No starred slates yet.
           </p>
         )
@@ -85,7 +87,7 @@ export function HomeStarredSection() {
         <Alert variant="destructive">
           <AlertTitle>Could not load starred slates</AlertTitle>
           <AlertDescription>Check your connection and try again.</AlertDescription>
-          <Button variant="outline" size="sm" onClick={() => query.refetch()}>
+          <Button variant="outline" size="sm" onClick={refetchSlates}>
             Try again
           </Button>
         </Alert>
@@ -95,11 +97,7 @@ export function HomeStarredSection() {
       {query.isFetchNextPageError && (
         <Alert variant="destructive" className="mt-3">
           <AlertTitle>Could not load more starred slates</AlertTitle>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => fetchNextPage().catch(() => undefined)}
-          >
+          <Button variant="outline" size="sm" onClick={retryNextPage}>
             Try again
           </Button>
         </Alert>

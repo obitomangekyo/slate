@@ -2,13 +2,17 @@ import type { SlateSummary } from "@slate/shared";
 import { Link } from "@tanstack/react-router";
 import { formatDistanceToNow } from "date-fns";
 import { NavArrowRight, Star } from "iconoir-react";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { Button } from "#/components/ui/button";
 import { useToggleStarredMutation } from "#/lib/slates";
 
 export function StarredSlateCard({ slate }: { slate: SlateSummary }) {
   const starMutation = useToggleStarredMutation();
   const slateRouteParams = useMemo(() => ({ slateId: slate.id }), [slate.id]);
+  const removeStar = useCallback(
+    async () => await starMutation.mutateAsync({ slateId: slate.id, starred: false }),
+    [slate.id, starMutation],
+  );
 
   return (
     <article className="group border-line bg-paper-raised hover:border-mineral relative flex min-h-28 flex-col justify-center rounded-sm border p-3 transition-colors">
@@ -42,7 +46,7 @@ export function StarredSlateCard({ slate }: { slate: SlateSummary }) {
         aria-label="Remove from starred"
         aria-pressed={slate.starred}
         disabled={starMutation.isPending}
-        onClick={() => starMutation.mutate({ slateId: slate.id, starred: false })}
+        onClick={removeStar}
         className="text-muted hover:text-clay absolute top-1 right-1 size-7"
       >
         <Star className="size-3.5 fill-current" />

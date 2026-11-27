@@ -2,11 +2,19 @@ import { useHotkeys } from "@tanstack/react-hotkeys";
 import { useDebouncedCallback } from "@tanstack/react-pacer";
 import { createFileRoute } from "@tanstack/react-router";
 import { NavArrowDown, Search } from "iconoir-react";
-import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ChangeEvent,
+  type RefObject,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useIntersection } from "react-use";
 import { HomeStarredSection } from "#/components/home-starred-section";
 import { RecentSlateCard } from "#/components/recent-slate-card";
-import { Alert, AlertDescription, AlertTitle } from "#/components/ui/alert";
+import { Alert, AlertAction, AlertDescription, AlertTitle } from "#/components/ui/alert";
 import { Button } from "#/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "#/components/ui/input-group";
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "#/components/ui/popover";
@@ -42,6 +50,11 @@ function RouteComponent() {
   const [search, setSearch] = useState("");
   const [scope, setScope] = useState<SlateScope>("all");
   const [starred, setStarred] = useState("all");
+  const handleScopeChange = useCallback(
+    (value: string | null) => setScope(value === "owned" || value === "shared" ? value : "all"),
+    [],
+  );
+  const handleStarredChange = useCallback((value: string | null) => setStarred(value ?? "all"), []);
   const endRef = useRef<HTMLDivElement>(null);
   const end = useIntersection(endRef as unknown as RefObject<HTMLElement>, {
     root: null,
@@ -51,21 +64,30 @@ function RouteComponent() {
   const saveSearch = useDebouncedCallback((value: string) => setSearch(value.trim()), {
     wait: 300,
   });
+  const handleSearchChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      setSearchText(event.target.value);
+      saveSearch(event.target.value);
+    },
+    [saveSearch],
+  );
   const query = useSlatePagesQuery({
     ...(search && { search }),
     scope,
     ...(starred !== "all" && { starred: starred === "true" }),
   });
-  const { fetchNextPage, hasNextPage, isFetchingNextPage } = query;
+  const { fetchNextPage, hasNextPage, isFetchingNextPage, refetch } = query;
   const slates = useMemo(
     () => query.data?.pages.flatMap((page) => page.slates) ?? [],
     [query.data],
   );
+  const refetchSlates = useCallback(() => refetch(), [refetch]);
+  const retryNextPage = useCallback(() => fetchNextPage(), [fetchNextPage]);
 
   // Load the next page before the person reaches the end of the slate grid.
   useEffect(() => {
     if (end?.isIntersecting && hasNextPage && !isFetchingNextPage) {
-      fetchNextPage().catch(() => undefined);
+      fetchNextPage();
     }
   }, [end?.isIntersecting, fetchNextPage, hasNextPage, isFetchingNextPage]);
 
@@ -111,10 +133,7 @@ function RouteComponent() {
               <InputGroupInput
                 aria-label="Search slates, people, or IDs"
                 value={searchText}
-                onChange={(event) => {
-                  setSearchText(event.target.value);
-                  saveSearch(event.target.value);
-                }}
+                onChange={handleSearchChange}
                 placeholder="Search slates, people, or IDs"
               />
             </InputGroup>
@@ -127,9 +146,9 @@ function RouteComponent() {
                 className="border-line bg-paper-raised text-ink w-72 gap-4 rounded-sm border p-4 shadow-[0_12px_32px_-18px_rgba(24,38,43,0.38)]"
               >
                 <PopoverTitle className="font-semibold">Filter slates</PopoverTitle>
-                <div className="text-muted-ink grid gap-1.5 text-xs font-medium">
+                <div className="text-muted grid gap-1.5 text-xs font-medium">
                   <span>Ownership</span>
-                  <Select value={scope} onValueChange={(value) => setScope(value ?? "all")}>
+                  <Select value={scope} onValueChange={handleScopeChange}>
                     <SelectTrigger className="w-full" aria-label="Slate ownership">
                       <SelectValue />
                     </SelectTrigger>
@@ -140,9 +159,9 @@ function RouteComponent() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="text-muted-ink grid gap-1.5 text-xs font-medium">
+                <div className="text-muted grid gap-1.5 text-xs font-medium">
                   <span>Starred</span>
-                  <Select value={starred} onValueChange={(value) => setStarred(value ?? "all")}>
+                  <Select value={starred} onValueChange={handleStarredChange}>
                     <SelectTrigger className="w-full" aria-label="Starred filter">
                       <SelectValue />
                     </SelectTrigger>
@@ -165,13 +184,13 @@ function RouteComponent() {
                 ))}
               </div>
             ) : search || starred !== "all" || scope !== "all" ? (
-              <p className="border-line bg-paper-raised text-muted-ink rounded-sm border border-dashed px-4 py-6 text-center text-sm">
+              <p className="border-line bg-paper-raised text-muted rounded-sm border border-dashed px-4 py-6 text-center text-sm">
                 No slates match these filters.
               </p>
             ) : (
               <div className="border-line bg-paper-raised rounded-sm border border-dashed px-4 py-8 text-center">
                 <p className="font-medium">No slates yet</p>
-                <p className="text-muted-ink mt-1 text-sm">
+                <p className="text-muted mt-1 text-sm">
                   Create a slate to start mapping ideas together.
                 </p>
                 <Button className="mt-4" onClick={create} disabled={createSlate.isPending}>
@@ -183,9 +202,11 @@ function RouteComponent() {
             <Alert variant="destructive">
               <AlertTitle>Could not load slates</AlertTitle>
               <AlertDescription>Check your connection and try again.</AlertDescription>
-              <Button variant="outline" size="sm" onClick={() => query.refetch()}>
-                Try again
-              </Button>
+              <AlertAction>
+                <Button variant="outline" size="sm" onClick={refetchSlates}>
+                  Try again
+                </Button>
+              </AlertAction>
             </Alert>
           ) : null}
 
@@ -194,13 +215,11 @@ function RouteComponent() {
           {query.isFetchNextPageError && (
             <Alert variant="destructive" className="mt-3">
               <AlertTitle>Could not load more slates</AlertTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => fetchNextPage().catch(() => undefined)}
-              >
-                Try again
-              </Button>
+              <AlertAction>
+                <Button variant="outline" size="sm" onClick={retryNextPage}>
+                  Try again
+                </Button>
+              </AlertAction>
             </Alert>
           )}
         </section>

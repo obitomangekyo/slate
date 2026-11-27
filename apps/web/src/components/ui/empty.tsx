@@ -70,7 +70,7 @@ function EmptyDescription({ className, ...props }: ComponentProps<"p">) {
     <p
       data-slot="empty-description"
       className={cn(
-        "text-muted-ink [&>a:hover]:text-mineral text-sm/relaxed [&>a]:underline [&>a]:underline-offset-4",
+        "text-muted [&>a:hover]:text-mineral text-sm/relaxed [&>a]:underline [&>a]:underline-offset-4",
         className,
       )}
       {...props}

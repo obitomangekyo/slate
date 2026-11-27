@@ -1,6 +1,7 @@
 import { Outlet } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { Toaster } from "#/components/ui/toast";
+import { TooltipProvider } from "#/components/ui/tooltip";
 import { reportError } from "#/lib/error-reporting";
 import { Sentry } from "#/lib/sentry";
 
@@ -30,8 +31,10 @@ export function RootLayout() {
 
   return (
     <Sentry.ErrorBoundary fallback={RootCrashFallback}>
-      <Outlet />
-      <Toaster />
+      <TooltipProvider>
+        <Outlet />
+        <Toaster />
+      </TooltipProvider>
     </Sentry.ErrorBoundary>
   );
 }

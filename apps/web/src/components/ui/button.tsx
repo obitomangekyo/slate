@@ -14,7 +14,7 @@ const buttonVariants = cva(
         secondary:
           "border-line/70 bg-paper text-ink hover:border-line hover:bg-paper-raised aria-expanded:bg-paper-raised",
         ghost:
-          "text-muted-ink hover:bg-paper-raised hover:text-ink aria-expanded:bg-paper-raised aria-expanded:text-ink",
+          "text-muted hover:bg-paper-raised hover:text-ink aria-expanded:bg-paper-raised aria-expanded:text-ink",
         clay: "border-ink/15 bg-clay text-ink hover:bg-clay/85 focus-visible:border-ink focus-visible:ring-clay/35",
         citron:
           "border-ink/15 bg-citron text-ink hover:bg-citron/80 focus-visible:border-ink focus-visible:ring-citron/40",

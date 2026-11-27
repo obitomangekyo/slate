@@ -81,6 +81,24 @@ export const UpdateSlateInputSchema = z
   .refine((input) => Object.keys(input).length > 0, "Change at least one slate setting.");
 export type UpdateSlateInput = z.infer<typeof UpdateSlateInputSchema>;
 
+export const InviteSlateCollaboratorSchema = z.object({
+  email: z.email().transform((email) => email.toLowerCase()),
+  role: z.enum(["editor", "viewer"]),
+});
+export type InviteSlateCollaborator = z.infer<typeof InviteSlateCollaboratorSchema>;
+
+export const InviteSlateCollaboratorsInputSchema = z
+  .array(InviteSlateCollaboratorSchema)
+  .min(1)
+  .max(20);
+export type InviteSlateCollaboratorsInput = z.infer<typeof InviteSlateCollaboratorsInputSchema>;
+
+export const InviteSlateCollaboratorResultSchema = InviteSlateCollaboratorSchema.extend({
+  sent: z.boolean(),
+  reason: z.string().optional(),
+});
+export type InviteSlateCollaboratorResult = z.infer<typeof InviteSlateCollaboratorResultSchema>;
+
 export const SlateDetailSchema = SlateMetaSchema.extend({
   ownerId: z.string().min(1),
   collaborators: z.array(

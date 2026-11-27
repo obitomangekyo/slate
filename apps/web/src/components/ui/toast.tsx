@@ -36,17 +36,17 @@ function ToastList() {
         ) : isSuccess ? (
           <CheckCircle className="text-mineral mt-0.5 size-4 shrink-0" strokeWidth={1.75} />
         ) : (
-          <InfoCircle className="text-muted-ink mt-0.5 size-4 shrink-0" strokeWidth={1.75} />
+          <InfoCircle className="text-muted mt-0.5 size-4 shrink-0" strokeWidth={1.75} />
         )}
 
         <Toast.Content className="flex flex-1 flex-col gap-0.5 pr-5">
           {toast.title && <Toast.Title className="text-ink text-xs font-semibold tracking-tight" />}
-          {toast.description && <Toast.Description className="text-muted-ink text-xs/relaxed" />}
+          {toast.description && <Toast.Description className="text-muted text-xs/relaxed" />}
         </Toast.Content>
 
         <Toast.Close
           aria-label="Dismiss notification"
-          className="text-muted-ink hover:bg-paper hover:text-ink absolute top-2.5 right-2.5 cursor-pointer rounded-xs p-0.5 transition-colors"
+          className="text-muted hover:bg-paper hover:text-ink absolute top-2.5 right-2.5 cursor-pointer rounded-xs p-0.5 transition-colors"
         >
           <Xmark className="size-3.5" strokeWidth={1.75} />
         </Toast.Close>

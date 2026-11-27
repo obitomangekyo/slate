@@ -6,7 +6,7 @@ const strengthLabels = ["Very weak", "Weak", "Fair", "Strong", "Very strong"] as
 type PasswordAssessment = {
   password: string;
   score: number;
-  feedback: string | null;
+  feedback?: string;
 };
 
 type PasswordEstimator = {
@@ -34,7 +34,7 @@ function getEstimator() {
             translations: english.translations,
           }),
       )
-      .catch((error: unknown) => {
+      .catch((error) => {
         // Clear a failed load so a later keystroke can try loading the library again.
         estimatorPromise = undefined;
         throw error;
@@ -56,13 +56,15 @@ export function usePasswordStrength(password: string) {
     let active = true;
     const timeout = window.setTimeout(() => {
       getEstimator()
-        .then((estimator) => {
+        ?.then((estimator) => {
           const result = estimator.check(password);
           if (!active) return;
           setAssessment({
             password,
             score: result.score,
-            feedback: result.feedback.warning || result.feedback.suggestions[0] || null,
+            ...((result.feedback.warning || result.feedback.suggestions.length) && {
+              feedback: result.feedback.warning || result.feedback.suggestions[0],
+            }),
           });
         })
         .catch(() => {
@@ -85,6 +87,6 @@ export function usePasswordStrength(password: string) {
     assessment: currentAssessment,
     isChecking,
     meetsMinimum: currentAssessment !== null && currentAssessment.score >= MIN_PASSWORD_SCORE,
-    label: currentAssessment ? (strengthLabels[currentAssessment.score] ?? "Unknown") : null,
+    ...(currentAssessment && { label: strengthLabels[currentAssessment.score] ?? "Unknown" }),
   };
 }

@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useCallback, useMemo } from "react";
 import { Button, buttonVariants } from "#/components/ui/button";
 import { toastManager } from "#/components/ui/toast";
 import { api } from "#/lib/api";
@@ -37,7 +37,7 @@ export const Route = createFileRoute("/_is_out/invitations/$token")({
 
 function InvitationPage() {
   const { token } = Route.useParams();
-  const navigate = useNavigate();
+  const navigate = Route.useNavigate();
   const queryClient = useQueryClient();
   const { data: invitation } = useSuspenseQuery(invitationQueryOptions(token));
   const { data: user } = useSuspenseQuery(authQueryOptions);
@@ -61,9 +61,13 @@ function InvitationPage() {
     },
   });
 
-  const loginRedirect = `/invitations/${token}`;
-  const loginSearch = useMemo(() => ({ redirect: loginRedirect }), [loginRedirect]);
+  const loginSearch = useMemo(() => ({ redirect: `/invitations/${token}` }), [token]);
   const previewParams = useMemo(() => ({ slateId: invitation.slateId }), [invitation.slateId]);
+
+  const handleAcceptInvite = useCallback(
+    async () => await acceptInvite.mutateAsync(),
+    [acceptInvite],
+  );
 
   return (
     <section className="auth-card border-line bg-paper-raised grid gap-5 rounded-sm border p-6 shadow-lg">
@@ -72,7 +76,7 @@ function InvitationPage() {
           Slate invitation
         </p>
         <h1 className="text-2xl font-semibold tracking-tight">{invitation.slateTitle}</h1>
-        <p className="text-muted-ink text-sm">
+        <p className="text-muted text-sm">
           {invitation.invitedBy} invited you to{" "}
           {invitation.role === "viewer" ? "view" : "collaborate on"} this slate.
         </p>
@@ -80,7 +84,7 @@ function InvitationPage() {
 
       {invitation.isPublic && (
         <div className="grid gap-2">
-          <p className="text-muted-ink text-sm">
+          <p className="text-muted text-sm">
             This slate is public, so you can look around before joining.
           </p>
           <Link
@@ -94,8 +98,8 @@ function InvitationPage() {
       )}
 
       {user ? (
-        <Button disabled={acceptInvite.isPending} onClick={() => acceptInvite.mutate()}>
-          {acceptInvite.isPending ? "Joining…" : "Accept invitation"}
+        <Button disabled={acceptInvite.isPending} onClick={handleAcceptInvite}>
+          {acceptInvite.isPending ? "Joining..." : "Accept invitation"}
         </Button>
       ) : (
         <Link to="/login" search={loginSearch} className={buttonVariants()}>

@@ -1,6 +1,6 @@
 type Props = {
-  score: number | null;
-  label: string | null;
+  score?: number;
+  label?: string;
 };
 
 // Keep the drawing measurements together so the five segments stay evenly spaced.
@@ -39,9 +39,9 @@ function segmentPath(index: number) {
   return `M ${startX} ${startY} A ${RADIUS} ${RADIUS} 0 0 0 ${endX} ${endY}`;
 }
 
-function colorForScore(score: number | null) {
+function colorForScore(score?: number) {
   // Match the ring color to the same five-level score shown beside the password field.
-  if (score === null) return "var(--color-line)";
+  if (score === undefined) return "var(--color-line)";
   if (score <= 1) return "var(--color-clay)";
   if (score === 2) return "var(--color-citron)";
   if (score === 3) return "var(--color-mineral)";
@@ -50,7 +50,7 @@ function colorForScore(score: number | null) {
 
 function PasswordStrengthRing({ score, label }: Props) {
   // A score of zero still fills one segment; no score leaves the whole ring empty.
-  const activeSegments = score === null ? 0 : score + 1;
+  const activeSegments = score === undefined ? 0 : score + 1;
   const color = colorForScore(score);
 
   return (

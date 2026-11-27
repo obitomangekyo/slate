@@ -4,8 +4,14 @@ import { useDebouncedCallback } from "@tanstack/react-pacer";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { GoogleCircle, Mail, User } from "iconoir-react";
 import { REGEXP_ONLY_DIGITS_AND_CHARS } from "input-otp";
-import { useState } from "react";
-import { Controller, type UseFormSetError, useForm, useWatch } from "react-hook-form";
+import { useCallback, useState } from "react";
+import {
+  Controller,
+  type ControllerProps,
+  type UseFormSetError,
+  useForm,
+  useWatch,
+} from "react-hook-form";
 import { AuthFormTransition } from "#/components/auth/auth-form-transition";
 import { PasswordInput } from "#/components/auth/password-input";
 import { Alert, AlertDescription } from "#/components/ui/alert";
@@ -42,6 +48,55 @@ import {
 import type { EmailVerificationChallenge } from "#/types/auth";
 
 const verificationSlots = ["first", "second", "third", "fourth", "fifth", "sixth"] as const;
+
+type RegistrationCodeInputProps = {
+  name: string;
+  value: string;
+  disabled: boolean;
+  invalid: boolean;
+  onChange: (value: string) => void;
+  onCodeChange: (value: string) => void;
+};
+
+function RegistrationCodeInput({
+  name,
+  value,
+  disabled,
+  invalid,
+  onChange,
+  onCodeChange,
+}: RegistrationCodeInputProps) {
+  const handleChange = useCallback(
+    (input: string) => {
+      // Strip separators but preserve letter case because the code is case-sensitive.
+      const code = input.replace(/[^A-Za-z0-9]/g, "").slice(0, 6);
+      onChange(code);
+      onCodeChange(code);
+    },
+    [onChange, onCodeChange],
+  );
+
+  return (
+    <InputOTP
+      id={name}
+      maxLength={6}
+      pattern={REGEXP_ONLY_DIGITS_AND_CHARS}
+      inputMode="text"
+      autoComplete="one-time-code"
+      value={value}
+      onChange={handleChange}
+      disabled={disabled}
+      aria-invalid={invalid}
+      aria-label="Six-character alphanumeric verification code"
+    >
+      <InputOTPGroup>
+        {verificationSlots.map((slot, index) => (
+          <InputOTPSlot key={slot} index={index} aria-invalid={invalid} />
+        ))}
+      </InputOTPGroup>
+    </InputOTP>
+  );
+}
 
 // Guests cannot visit registration after the current-user query finds a session.
 export const Route = createFileRoute("/_is_out/register")({
@@ -95,72 +150,210 @@ function RouteComponent() {
     });
   };
 
-  const handleVerificationChange = (value: string, fieldOnChange: (value: string) => void) => {
-    // Strip separators but preserve letter case because the code is case-sensitive.
-    const code = value.replace(/[^A-Za-z0-9]/g, "").slice(0, 6);
-    fieldOnChange(code);
-    clearErrors("code");
-
-    if (code.length < 6) return;
-
-    if (!challenge || verifyEmailMutation.isPending) return;
-    onVerify(challenge.challengeId, { code }, setError);
-  };
-
-  const handleEditDetails = () => {
+  const handleEditDetails = useCallback(() => {
     // Return to the first step without discarding the name, email, or password.
     setValue("code", "", { shouldValidate: false });
     clearErrors("code");
 
     setChallenge(null);
     setResendMessage(null);
-  };
+  }, [clearErrors, setValue]);
 
-  const onVerify = (
-    challengeId: string,
-    values: VerificationFormValues,
-    setFormError: UseFormSetError<RegistrationFormValues>,
-  ) => {
-    // The API creates the session after verification, so success can navigate immediately.
-    verifyEmailMutation.mutate(
-      { challengeId, code: values.code },
-      {
-        onSuccess: () => navigate({ to: redirectTo || "/" }),
-        onError: (err) => {
-          setValue("code", "", { shouldValidate: false });
-          clearErrors("code");
-          handleFormApiError(err, setFormError, "Could not verify your email");
+  const onVerify = useCallback(
+    (
+      challengeId: string,
+      values: VerificationFormValues,
+      setFormError: UseFormSetError<RegistrationFormValues>,
+    ) => {
+      // The API creates the session after verification, so success can navigate immediately.
+      verifyEmailMutation.mutate(
+        { challengeId, code: values.code },
+        {
+          onSuccess: () => navigate({ to: redirectTo || "/" }),
+          onError: (err) => {
+            setValue("code", "", { shouldValidate: false });
+            clearErrors("code");
+            handleFormApiError(err, setFormError, "Could not verify your email");
+          },
         },
-      },
-    );
-  };
+      );
+    },
+    [clearErrors, navigate, redirectTo, setValue, verifyEmailMutation],
+  );
+  const handleVerificationCode = useCallback(
+    (code: string) => {
+      clearErrors("code");
 
-  const onResend = (setFormError: UseFormSetError<RegistrationFormValues>) => {
-    // Prevent repeated clicks while waiting for the API or its resend timer.
-    if (!challenge || resendMutation.isPending || resendCooldown > 0) return;
-    setResendMessage(null);
-    resendMutation.mutate(
-      { challengeId: challenge.challengeId },
-      {
-        onSuccess: ({ resendAvailableAt }) => {
-          setChallenge((current) => (current ? { ...current, resendAvailableAt } : current));
-          setValue("code", "", { shouldValidate: false });
-          clearErrors("code");
-          setResendMessage("A fresh verification code has been sent.");
+      if (code.length < 6) return;
+
+      if (!challenge || verifyEmailMutation.isPending) return;
+      onVerify(challenge.challengeId, { code }, setError);
+    },
+    [challenge, clearErrors, onVerify, setError, verifyEmailMutation],
+  );
+
+  const onResend = useCallback(
+    (setFormError: UseFormSetError<RegistrationFormValues>) => {
+      // Prevent repeated clicks while waiting for the API or its resend timer.
+      if (!challenge || resendMutation.isPending || resendCooldown > 0) return;
+      setResendMessage(null);
+      resendMutation.mutate(
+        { challengeId: challenge.challengeId },
+        {
+          onSuccess: ({ resendAvailableAt }) => {
+            setChallenge((current) => (current ? { ...current, resendAvailableAt } : current));
+            setValue("code", "", { shouldValidate: false });
+            clearErrors("code");
+            setResendMessage("A fresh verification code has been sent.");
+          },
+          onError: (err) =>
+            handleFormApiError(err, setFormError, "Could not resend your verification code"),
         },
-        onError: (err) =>
-          handleFormApiError(err, setFormError, "Could not resend your verification code"),
-      },
-    );
-  };
+      );
+    },
+    [challenge, clearErrors, resendCooldown, resendMutation, setValue],
+  );
   const debouncedOnResend = useDebouncedCallback(onResend, { wait: 300 });
+  const handleResendClick = useCallback(() => {
+    debouncedOnResend(setError);
+  }, [debouncedOnResend, setError]);
 
-  const onGoogle = () => {
+  const onGoogle = useCallback(() => {
     // OAuth begins at the API, which owns the callback and session cookies.
     const url = new URL("/api/auth/google", window.location.origin);
     if (redirectTo) url.searchParams.set("redirect", redirectTo);
     window.location.assign(url.toString());
-  };
+  }, [redirectTo]);
+
+  const renderNameField = useCallback<ControllerProps<RegistrationFormValues>["render"]>(
+    ({ field, fieldState }) => (
+      <Field data-invalid={fieldState.invalid}>
+        <FieldLabel htmlFor={field.name}>Name</FieldLabel>
+        <InputGroup>
+          <InputGroupAddon align="inline-start" aria-hidden="true">
+            <User strokeWidth={1.75} />
+          </InputGroupAddon>
+          <InputGroupInput
+            {...field}
+            id={field.name}
+            autoComplete="name"
+            maxLength={MAX_USER_NAME_LENGTH}
+            disabled={fieldsDisabled}
+            aria-invalid={fieldState.invalid}
+            placeholder="Ada Lovelace"
+          />
+        </InputGroup>
+        <FieldDescription>Your teammates will see this name in Slate.</FieldDescription>
+        {fieldState.invalid && <FieldError>{fieldState.error?.message}</FieldError>}
+      </Field>
+    ),
+    [fieldsDisabled],
+  );
+  const renderEmailField = useCallback<ControllerProps<RegistrationFormValues>["render"]>(
+    ({ field, fieldState }) => (
+      <Field data-invalid={fieldState.invalid}>
+        <FieldLabel htmlFor={field.name}>Email</FieldLabel>
+        <InputGroup>
+          <InputGroupAddon align="inline-start" aria-hidden="true">
+            <Mail strokeWidth={1.75} />
+          </InputGroupAddon>
+          <InputGroupInput
+            {...field}
+            id={field.name}
+            type="email"
+            autoComplete="email"
+            disabled={fieldsDisabled}
+            aria-invalid={fieldState.invalid}
+            placeholder="you@studio.dev"
+          />
+        </InputGroup>
+        {fieldState.invalid && <FieldError>{fieldState.error?.message}</FieldError>}
+      </Field>
+    ),
+    [fieldsDisabled],
+  );
+  const renderPasswordField = useCallback<ControllerProps<RegistrationFormValues>["render"]>(
+    ({ field, fieldState }) => (
+      <Field data-invalid={fieldState.invalid}>
+        <FieldLabel htmlFor={field.name}>Password</FieldLabel>
+        <PasswordInput
+          {...field}
+          id={field.name}
+          autoComplete="new-password"
+          minLength={MIN_PASSWORD_LENGTH}
+          maxLength={MAX_PASSWORD_LENGTH}
+          disabled={fieldsDisabled}
+          aria-invalid={fieldState.invalid}
+          placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
+          {...(assessment && { strengthScore: assessment.score })}
+          {...(label !== undefined && { strengthLabel: label })}
+        />
+        {!challenge && (!assessment || assessment.score < MIN_PASSWORD_SCORE) && (
+          <div className="space-y-2 pt-1">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-muted text-xs">Password strength</span>
+              <span className="text-ink text-xs font-medium" aria-live="polite">
+                {isChecking ? "Checking..." : (label ?? "Not assessed")}
+              </span>
+            </div>
+            {assessment && assessment.score < MIN_PASSWORD_SCORE && (
+              <p className="text-clay text-xs">
+                This password is too easy to guess. Slate requires a Strong password or better.
+                {assessment.feedback ? ` ${assessment.feedback}` : ""}
+              </p>
+            )}
+            {!assessment && !isChecking && (
+              <p className="text-muted text-xs">
+                Use a unique passphrase. Your password must score Strong or better.
+              </p>
+            )}
+          </div>
+        )}
+        {fieldState.invalid && <FieldError>{fieldState.error?.message}</FieldError>}
+      </Field>
+    ),
+    [assessment, challenge, fieldsDisabled, isChecking, label],
+  );
+  const renderConfirmPasswordField = useCallback<ControllerProps<RegistrationFormValues>["render"]>(
+    ({ field, fieldState }) => (
+      <Field data-invalid={fieldState.invalid}>
+        <FieldLabel htmlFor={field.name}>Confirm password</FieldLabel>
+        <PasswordInput
+          {...field}
+          id={field.name}
+          autoComplete="new-password"
+          maxLength={MAX_PASSWORD_LENGTH}
+          disabled={fieldsDisabled}
+          aria-invalid={fieldState.invalid}
+          placeholder="Enter your password again"
+        />
+        {fieldState.invalid && <FieldError>{fieldState.error?.message}</FieldError>}
+      </Field>
+    ),
+    [fieldsDisabled],
+  );
+  const renderCodeField = useCallback<ControllerProps<RegistrationFormValues>["render"]>(
+    ({ field, fieldState }) => (
+      <Field data-invalid={fieldState.invalid}>
+        <FieldLabel htmlFor={field.name}>Email verification code</FieldLabel>
+        <RegistrationCodeInput
+          name={field.name}
+          value={field.value ?? ""}
+          onChange={field.onChange}
+          onCodeChange={handleVerificationCode}
+          disabled={verifyEmailMutation.isPending}
+          invalid={fieldState.invalid}
+        />
+        {fieldState.invalid && <FieldError>{fieldState.error?.message}</FieldError>}
+        {verifyEmailMutation.isPending && (
+          <output aria-live="polite" className="text-muted text-xs">
+            Verifying your email...
+          </output>
+        )}
+      </Field>
+    ),
+    [handleVerificationCode, verifyEmailMutation.isPending],
+  );
 
   // Keep the same card layout while its contents switch between registration steps.
   return (
@@ -169,7 +362,7 @@ function RouteComponent() {
         <h1 className="font-semibold tracking-tight">
           {challenge ? "Check your email" : "Create your account"}
         </h1>
-        <p className="text-muted-ink">
+        <p className="text-muted">
           {challenge ? (
             <>
               Enter the six-character code exactly as it appears in the email sent to{" "}
@@ -202,156 +395,19 @@ function RouteComponent() {
             </>
           )}
 
-          <Controller
-            name="name"
-            control={control}
-            render={({ field, fieldState }) => (
-              <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor={field.name}>Name</FieldLabel>
-                <InputGroup>
-                  <InputGroupAddon align="inline-start" aria-hidden="true">
-                    <User strokeWidth={1.75} />
-                  </InputGroupAddon>
-                  <InputGroupInput
-                    {...field}
-                    id={field.name}
-                    autoComplete="name"
-                    maxLength={MAX_USER_NAME_LENGTH}
-                    disabled={fieldsDisabled}
-                    aria-invalid={fieldState.invalid}
-                    placeholder="Ada Lovelace"
-                  />
-                </InputGroup>
-                <FieldDescription>Your teammates will see this name in Slate.</FieldDescription>
-                {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-              </Field>
-            )}
-          />
+          <Controller name="name" control={control} render={renderNameField} />
 
-          <Controller
-            name="email"
-            control={control}
-            render={({ field, fieldState }) => (
-              <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor={field.name}>Email</FieldLabel>
-                <InputGroup>
-                  <InputGroupAddon align="inline-start" aria-hidden="true">
-                    <Mail strokeWidth={1.75} />
-                  </InputGroupAddon>
-                  <InputGroupInput
-                    {...field}
-                    id={field.name}
-                    type="email"
-                    autoComplete="email"
-                    disabled={fieldsDisabled}
-                    aria-invalid={fieldState.invalid}
-                    placeholder="you@studio.dev"
-                  />
-                </InputGroup>
-                {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-              </Field>
-            )}
-          />
+          <Controller name="email" control={control} render={renderEmailField} />
 
-          <Controller
-            name="password"
-            control={control}
-            render={({ field, fieldState }) => (
-              <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor={field.name}>Password</FieldLabel>
-                <PasswordInput
-                  {...field}
-                  id={field.name}
-                  autoComplete="new-password"
-                  minLength={MIN_PASSWORD_LENGTH}
-                  maxLength={MAX_PASSWORD_LENGTH}
-                  disabled={fieldsDisabled}
-                  aria-invalid={fieldState.invalid}
-                  placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
-                  strengthScore={assessment?.score ?? null}
-                  strengthLabel={label}
-                />
-                {!challenge && (!assessment || assessment.score < MIN_PASSWORD_SCORE) && (
-                  <div className="space-y-2 pt-1">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-muted-ink text-xs">Password strength</span>
-                      <span className="text-ink text-xs font-medium" aria-live="polite">
-                        {isChecking ? "Checking..." : (label ?? "Not assessed")}
-                      </span>
-                    </div>
-                    {assessment && assessment.score < MIN_PASSWORD_SCORE && (
-                      <p className="text-clay text-xs">
-                        This password is too easy to guess. Slate requires a Strong password or
-                        better.{assessment.feedback ? ` ${assessment.feedback}` : ""}
-                      </p>
-                    )}
-                    {!assessment && !isChecking && (
-                      <p className="text-muted-ink text-xs">
-                        Use a unique passphrase. Your password must score Strong or better.
-                      </p>
-                    )}
-                  </div>
-                )}
-                {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-              </Field>
-            )}
-          />
+          <Controller name="password" control={control} render={renderPasswordField} />
 
           <Controller
             name="confirmPassword"
             control={control}
-            render={({ field, fieldState }) => (
-              <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor={field.name}>Confirm password</FieldLabel>
-                <PasswordInput
-                  {...field}
-                  id={field.name}
-                  autoComplete="new-password"
-                  maxLength={MAX_PASSWORD_LENGTH}
-                  disabled={fieldsDisabled}
-                  aria-invalid={fieldState.invalid}
-                  placeholder="Enter your password again"
-                />
-                {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-              </Field>
-            )}
+            render={renderConfirmPasswordField}
           />
 
-          {challenge && (
-            <Controller
-              name="code"
-              control={control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor={field.name}>Email verification code</FieldLabel>
-                  <InputOTP
-                    id={field.name}
-                    maxLength={6}
-                    pattern={REGEXP_ONLY_DIGITS_AND_CHARS}
-                    inputMode="text"
-                    autoComplete="one-time-code"
-                    value={field.value ?? ""}
-                    onChange={(value) => handleVerificationChange(value, field.onChange)}
-                    disabled={verifyEmailMutation.isPending}
-                    aria-invalid={fieldState.invalid}
-                    aria-label="Six-character alphanumeric verification code"
-                  >
-                    <InputOTPGroup>
-                      {verificationSlots.map((slot, index) => (
-                        <InputOTPSlot key={slot} index={index} aria-invalid={fieldState.invalid} />
-                      ))}
-                    </InputOTPGroup>
-                  </InputOTP>
-                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                  {verifyEmailMutation.isPending && (
-                    <output aria-live="polite" className="text-muted-ink text-xs">
-                      Verifying your email...
-                    </output>
-                  )}
-                </Field>
-              )}
-            />
-          )}
+          {challenge && <Controller name="code" control={control} render={renderCodeField} />}
 
           {!challenge ? (
             <Button
@@ -370,7 +426,7 @@ function RouteComponent() {
                 disabled={
                   resendMutation.isPending || verifyEmailMutation.isPending || resendCooldown > 0
                 }
-                onClick={() => debouncedOnResend(setError)}
+                onClick={handleResendClick}
               >
                 {resendMutation.isPending
                   ? "Sending another code..."
@@ -398,7 +454,7 @@ function RouteComponent() {
       </form>
 
       {!challenge && (
-        <p className="text-muted-ink mt-5 text-center text-xs">
+        <p className="text-muted mt-5 text-center text-xs">
           Already have an account?{" "}
           <Link
             to="/login"

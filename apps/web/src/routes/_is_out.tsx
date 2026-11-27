@@ -1,7 +1,7 @@
 import { animated, config, useSpring } from "@react-spring/web";
 import { createFileRoute, Outlet, useLocation } from "@tanstack/react-router";
 import { cn } from "cn";
-import { useEffect, useMemo } from "react";
+import { type PointerEvent, useCallback, useEffect, useMemo } from "react";
 import { useMeasure, useMedia } from "react-use";
 import SlateAppIcon from "#/assets/svgs/slate-app-icon.svg?react";
 
@@ -61,18 +61,21 @@ function RouteComponent() {
     sceneApi.start({ x: 0, y: 0, immediate: reducedMotion });
   }, [reducedMotion, sceneApi]);
 
-  const handlePointerMove = (event: React.PointerEvent<HTMLElement>) => {
-    if (reducedMotion) return;
-    const bounds = event.currentTarget.getBoundingClientRect();
-    const strength = event.pointerType === "touch" ? 0.45 : 1;
-    const x = ((event.clientX - bounds.left) / bounds.width - 0.5) * 2 * strength;
-    const y = ((event.clientY - bounds.top) / bounds.height - 0.5) * 2 * strength;
-    sceneApi.start({ x, y });
-  };
+  const handlePointerMove = useCallback(
+    (event: PointerEvent<HTMLElement>) => {
+      if (reducedMotion) return;
+      const bounds = event.currentTarget.getBoundingClientRect();
+      const strength = event.pointerType === "touch" ? 0.45 : 1;
+      const x = ((event.clientX - bounds.left) / bounds.width - 0.5) * 2 * strength;
+      const y = ((event.clientY - bounds.top) / bounds.height - 0.5) * 2 * strength;
+      sceneApi.start({ x, y });
+    },
+    [reducedMotion, sceneApi],
+  );
 
-  const handlePointerLeave = () => {
+  const handlePointerLeave = useCallback(() => {
     if (!reducedMotion) sceneApi.start({ x: 0, y: 0 });
-  };
+  }, [reducedMotion, sceneApi]);
 
   return (
     <main

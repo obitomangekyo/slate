@@ -54,7 +54,7 @@ function AlertDescription({ className, ...props }: ComponentProps<"div">) {
     <div
       data-slot="alert-description"
       className={cn(
-        "text-muted-ink [&_a:hover]:text-mineral text-xs/relaxed text-balance md:text-pretty [&_a]:underline [&_a]:underline-offset-3 [&_p:not(:last-child)]:mb-3",
+        "text-muted [&_a:hover]:text-mineral text-xs/relaxed text-balance md:text-pretty [&_a]:underline [&_a]:underline-offset-3 [&_p:not(:last-child)]:mb-3",
         className,
       )}
       {...props}

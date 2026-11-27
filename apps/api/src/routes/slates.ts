@@ -1,5 +1,9 @@
 import { createHash, randomBytes } from "node:crypto";
-import { CreateSlateInputSchema, UpdateSlateInputSchema } from "@slate/shared";
+import {
+  CreateSlateInputSchema,
+  InviteSlateCollaboratorsInputSchema,
+  UpdateSlateInputSchema,
+} from "@slate/shared";
 import { Router } from "express";
 import { Types } from "mongoose";
 import { z } from "zod";
@@ -26,13 +30,6 @@ const SlateListQuerySchema = z.object({
   cursor: z.string().optional(),
 });
 const SlateIdParamsSchema = z.object({ slateId: z.string().min(1) });
-const InviteSchema = z.object({
-  emails: z
-    .array(z.email().transform((email) => email.toLowerCase()))
-    .min(1)
-    .max(20),
-  role: z.enum(["editor", "viewer"]).default("editor"),
-});
 
 // This read-only endpoint is intentionally outside the authenticated routes below.
 slatesRouter.get("/public/:slateId", async (req, res) => {
@@ -129,7 +126,7 @@ slatesRouter.post(
   "/:slateId/invitations",
   requireSlateAccess("editor"),
   validateRequest(
-    z.object({ params: SlateIdParamsSchema, body: InviteSchema }),
+    z.object({ params: SlateIdParamsSchema, body: InviteSlateCollaboratorsInputSchema }),
     (req) => ({ params: req.params, body: req.body }),
     async (req, res, { params, body }) => {
       const slate = await SlateModel.findById(params.slateId).lean();
@@ -142,20 +139,20 @@ slatesRouter.post(
         sendGeneralError(res, 401, "Authentication required");
         return;
       }
-      const distinctEmails = [...new Set(body.emails)];
+      const distinctEmails = [...new Set(body.map((item) => item.email))];
       const results = await Promise.all(
-        body.emails.map(async (email) => {
+        body.map(async ({ email, role }) => {
           if (email === req.user?.email.toLowerCase())
-            return { email, sent: false, reason: "You cannot invite your own account" };
+            return { email, role, sent: false, reason: "You cannot invite your own account" };
           if (distinctEmails.filter((candidate) => candidate === email).length > 1)
-            return { email, sent: false, reason: "This address appears more than once" };
+            return { email, role, sent: false, reason: "This address appears more than once" };
           const existingUser = await UserModel.findOne({ email }).select("_id").lean();
           if (
             existingUser &&
             (slate.ownerId === existingUser._id.toString() ||
               slate.collaborators.some((person) => person.userId === existingUser._id.toString()))
           ) {
-            return { email, sent: false, reason: "This person already has access" };
+            return { email, role, sent: false, reason: "This person already has access" };
           }
           const token = randomBytes(32).toString("base64url");
           const tokenHash = createHash("sha256").update(token).digest("hex");
@@ -169,7 +166,7 @@ slatesRouter.post(
                   tokenHash,
                   expiresAt,
                   invitedBy: currentUserId,
-                  role: body.role,
+                  role,
                   acceptedAt: null,
                   deliveryFailed: false,
                 },
@@ -181,13 +178,13 @@ slatesRouter.post(
               slate.title,
               `${env.WEB_APP_URL}/invitations/${token}`,
             );
-            return { email, sent: true };
+            return { email, role, sent: true };
           } catch {
             await SlateInvitationModel.updateOne(
               { slateId: params.slateId, email, tokenHash },
               { $set: { deliveryFailed: true } },
             );
-            return { email, sent: false, reason: "The invitation email could not be sent" };
+            return { email, role, sent: false, reason: "The invitation email could not be sent" };
           }
         }),
       );

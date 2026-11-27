@@ -1,4 +1,11 @@
-import type { ApiErrorResponse, CreateSlateInput, SlateDetail, SlateSummary } from "@slate/shared";
+import type {
+  ApiErrorResponse,
+  CreateSlateInput,
+  InviteSlateCollaboratorResult,
+  InviteSlateCollaboratorsInput,
+  SlateDetail,
+  SlateSummary,
+} from "@slate/shared";
 import {
   infiniteQueryOptions,
   queryOptions,
@@ -133,12 +140,18 @@ export function useUpdateSlateMutation() {
       }>(`/slates/${slateId}`, changes);
       return data.slate;
     },
-    onSuccess: (slate) => {
+    onSuccess: (slate, { changes }) => {
       queryClient.setQueryData(["slates", slate.id], (current: SlateDetail | undefined) =>
         current ? { ...current, ...slate } : current,
       );
       queryClient.invalidateQueries({ queryKey: ["slates", "pages"] });
       queryClient.invalidateQueries({ queryKey: slatesQueryOptions.queryKey });
+      if (changes.isPublic !== undefined) {
+        toastManager.add({
+          type: "success",
+          title: `Slate is now ${slate.isPublic ? "public" : "private"}`,
+        });
+      }
     },
     onError: (error) => {
       toastManager.add({
@@ -174,18 +187,18 @@ export function useDeleteSlateMutation() {
 // Send all invite addresses together and report individual delivery results.
 export function useInviteCollaboratorsMutation(slateId: string) {
   return useMutation<
-    { results: { email: string; sent: boolean; reason?: string }[] },
+    InviteSlateCollaboratorResult[],
     AxiosError<ApiErrorResponse>,
-    { emails: string[]; role?: "editor" | "viewer" }
+    InviteSlateCollaboratorsInput
   >({
     mutationFn: async (input) => {
       const { data } = await api.post<{
-        results: { email: string; sent: boolean; reason?: string }[];
+        results: InviteSlateCollaboratorResult[];
       }>(`/slates/${slateId}/invitations`, input);
-      return data;
+      return data.results;
     },
     onSuccess: (result) => {
-      const sentCount = result.results.filter((item) => item.sent).length;
+      const sentCount = result.filter((item) => item.sent).length;
       if (sentCount)
         toastManager.add({
           type: "success",

@@ -78,7 +78,7 @@ export function WorkspaceHeader() {
             <DropdownMenuGroup>
               <DropdownMenuLabel>
                 <span className="text-ink block text-sm font-semibold">{user?.name}</span>
-                <span className="text-muted-ink mt-0.5 block truncate text-xs font-normal">
+                <span className="text-muted mt-0.5 block truncate text-xs font-normal">
                   {user?.email}
                 </span>
               </DropdownMenuLabel>

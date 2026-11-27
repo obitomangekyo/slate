@@ -4,8 +4,8 @@ import { useDebouncedCallback } from "@tanstack/react-pacer";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { GoogleCircle, Mail, WarningCircle } from "iconoir-react";
 import { REGEXP_ONLY_DIGITS_AND_CHARS } from "input-otp";
-import { useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { useCallback, useState } from "react";
+import { Controller, type ControllerProps, useForm } from "react-hook-form";
 import { z } from "zod";
 import { AuthFormTransition } from "#/components/auth/auth-form-transition";
 import { PasswordInput } from "#/components/auth/password-input";
@@ -104,26 +104,29 @@ function RouteComponent() {
     });
   };
 
-  const handleVerificationChange = (value: string) => {
-    // Remove separators but preserve letter case because the code is case-sensitive.
-    const nextCode = value.replace(/[^A-Za-z0-9]/g, "").slice(0, 6);
-    setCode(nextCode);
-    setResendMessage(null);
+  const handleVerificationChange = useCallback(
+    (value: string) => {
+      // Remove separators but preserve letter case because the code is case-sensitive.
+      const nextCode = value.replace(/[^A-Za-z0-9]/g, "").slice(0, 6);
+      setCode(nextCode);
+      setResendMessage(null);
 
-    if (nextCode.length < 6) return;
-    if (!verification || verifyEmailMutation.isPending) return;
+      if (nextCode.length < 6) return;
+      if (!verification || verifyEmailMutation.isPending) return;
 
-    const input: VerifyEmailInput = { challengeId: verification.challengeId, code: nextCode };
-    verifyEmailMutation.mutate(input, {
-      onSuccess: () => navigate({ to: redirectTo || "/" }),
-      onError: (error) => {
-        setCode("");
-        handleFormApiError(error, setError, "Could not verify your email");
-      },
-    });
-  };
+      const input: VerifyEmailInput = { challengeId: verification.challengeId, code: nextCode };
+      verifyEmailMutation.mutate(input, {
+        onSuccess: () => navigate({ to: redirectTo || "/" }),
+        onError: (error) => {
+          setCode("");
+          handleFormApiError(error, setError, "Could not verify your email");
+        },
+      });
+    },
+    [navigate, redirectTo, setError, verification, verifyEmailMutation],
+  );
 
-  const handleResendCode = () => {
+  const handleResendCode = useCallback(() => {
     // The server enforces this cooldown too; this check keeps the interface in sync.
     if (!verification || resendMutation.isPending || resendCooldown > 0) return;
     setResendMessage(null);
@@ -138,23 +141,23 @@ function RouteComponent() {
         onError: (error) => handleFormApiError(error, setError, "Could not resend your code"),
       },
     );
-  };
+  }, [resendCooldown, resendMutation, setError, verification]);
   const debouncedHandleResendCode = useDebouncedCallback(handleResendCode, { wait: 300 });
 
-  const returnToSignIn = () => {
+  const returnToSignIn = useCallback(() => {
     // Clear pending errors and challenge details when leaving verification mode.
     loginMutation.reset();
     verifyEmailMutation.reset();
     setCode("");
     setResendMessage(null);
     setResendAvailableAtOverride(undefined);
-  };
+  }, [loginMutation, verifyEmailMutation]);
 
   const oauthErrorMessage = oauthError
     ? "Google sign-in could not be completed. Please try again."
     : null;
 
-  const handleGoogleSignIn = () => {
+  const handleGoogleSignIn = useCallback(() => {
     // Start OAuth on our API so the API can safely manage its state cookies.
     const url = new URL("/api/auth/google", window.location.origin);
 
@@ -163,7 +166,48 @@ function RouteComponent() {
     }
 
     window.location.assign(url.toString());
-  };
+  }, [redirectTo]);
+
+  const renderEmailField = useCallback<ControllerProps<LoginInput>["render"]>(
+    ({ field, fieldState }) => (
+      <Field data-invalid={fieldState.invalid}>
+        <FieldLabel htmlFor={field.name}>Email</FieldLabel>
+        <InputGroup>
+          <InputGroupAddon align="inline-start" aria-hidden="true">
+            <Mail strokeWidth={1.75} />
+          </InputGroupAddon>
+          <InputGroupInput
+            {...field}
+            id={field.name}
+            type="email"
+            autoComplete="email"
+            aria-invalid={fieldState.invalid}
+            disabled={Boolean(verification)}
+            placeholder="you@studio.dev"
+          />
+        </InputGroup>
+        {fieldState.error?.message && <FieldError>{fieldState.error.message}</FieldError>}
+      </Field>
+    ),
+    [verification],
+  );
+  const renderPasswordField = useCallback<ControllerProps<LoginInput>["render"]>(
+    ({ field, fieldState }) => (
+      <Field data-invalid={fieldState.invalid}>
+        <FieldLabel htmlFor={field.name}>Password</FieldLabel>
+        <PasswordInput
+          {...field}
+          id={field.name}
+          autoComplete="current-password"
+          aria-invalid={fieldState.invalid}
+          disabled={Boolean(verification)}
+          placeholder="••••••••"
+        />
+        {fieldState.error?.message && <FieldError>{fieldState.error.message}</FieldError>}
+      </Field>
+    ),
+    [verification],
+  );
 
   // Show either the password form or the code form based on the login response.
   return (
@@ -172,7 +216,7 @@ function RouteComponent() {
         <h1 className="font-semibold tracking-tight">
           {verification ? "Verify your email" : "Sign in to your workspace"}
         </h1>
-        <p className="text-muted-ink">
+        <p className="text-muted">
           {verification ? (
             <>
               Enter the six-character code exactly as it appears in the email sent to{" "}
@@ -204,49 +248,9 @@ function RouteComponent() {
 
         <form onSubmit={handleSubmit(onSubmit)} noValidate>
           <FieldGroup>
-            <Controller
-              name="email"
-              control={control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor={field.name}>Email</FieldLabel>
-                  <InputGroup>
-                    <InputGroupAddon align="inline-start" aria-hidden="true">
-                      <Mail strokeWidth={1.75} />
-                    </InputGroupAddon>
-                    <InputGroupInput
-                      {...field}
-                      id={field.name}
-                      type="email"
-                      autoComplete="email"
-                      aria-invalid={fieldState.invalid}
-                      disabled={Boolean(verification)}
-                      placeholder="you@studio.dev"
-                    />
-                  </InputGroup>
-                  {fieldState.error?.message && <FieldError>{fieldState.error.message}</FieldError>}
-                </Field>
-              )}
-            />
+            <Controller name="email" control={control} render={renderEmailField} />
 
-            <Controller
-              name="password"
-              control={control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor={field.name}>Password</FieldLabel>
-                  <PasswordInput
-                    {...field}
-                    id={field.name}
-                    autoComplete="current-password"
-                    aria-invalid={fieldState.invalid}
-                    disabled={Boolean(verification)}
-                    placeholder="••••••••"
-                  />
-                  {fieldState.error?.message && <FieldError>{fieldState.error.message}</FieldError>}
-                </Field>
-              )}
-            />
+            <Controller name="password" control={control} render={renderPasswordField} />
 
             {verification ? (
               <>
@@ -270,7 +274,7 @@ function RouteComponent() {
                     </InputOTPGroup>
                   </InputOTP>
                   {verifyEmailMutation.isPending && (
-                    <output aria-live="polite" className="text-muted-ink text-xs">
+                    <output aria-live="polite" className="text-muted text-xs">
                       Verifying your email...
                     </output>
                   )}
@@ -319,7 +323,7 @@ function RouteComponent() {
       </FieldGroup>
 
       {!verification && (
-        <p className="text-muted-ink mt-5 text-center text-xs">
+        <p className="text-muted mt-5 text-center text-xs">
           New to Slate?{" "}
           <Link
             to="/register"
