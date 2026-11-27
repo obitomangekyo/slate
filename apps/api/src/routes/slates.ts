@@ -9,7 +9,7 @@ import { Types } from "mongoose";
 import { z } from "zod";
 import { env } from "#/env";
 import { sendSlateInvitation } from "#/lib/email";
-import { sendGeneralError } from "#/lib/httpErrors";
+import { HttpError, sendGeneralError, sendSuccess } from "#/lib/httpErrors";
 import { requireAuth, requireSlateAccess } from "#/middleware/auth";
 import { validateRequest } from "#/middleware/validateRequest";
 import { CanvasEdgeModel } from "#/models/edge";
@@ -18,6 +18,7 @@ import { SlateModel } from "#/models/slate";
 import { SlateInvitationModel } from "#/models/slateInvitation";
 import { SlateStarModel } from "#/models/slateStar";
 import { UserModel } from "#/models/user";
+import { runAuditedAction } from "#/services/audit";
 
 export const slatesRouter: Router = Router();
 
@@ -51,7 +52,7 @@ slatesRouter.get("/public/:slateId", async (req, res) => {
     CanvasNodeModel.find({ slateId }).lean(),
     CanvasEdgeModel.find({ slateId }).lean(),
   ]);
-  res.json({
+  sendSuccess(res, 200, "Public slate retrieved.", {
     slate: {
       id: slate._id.toString(),
       title: slate.title,
@@ -109,7 +110,7 @@ slatesRouter.get("/invitations/:token", async (req, res) => {
     sendGeneralError(res, 404, "Slate not found");
     return;
   }
-  res.json({
+  sendSuccess(res, 200, "Invitation retrieved.", {
     invitation: {
       slateId: slate._id.toString(),
       slateTitle: slate.title,
@@ -140,55 +141,83 @@ slatesRouter.post(
         return;
       }
       const distinctEmails = [...new Set(body.map((item) => item.email))];
-      const results = await Promise.all(
-        body.map(async ({ email, role }) => {
-          if (email === req.user?.email.toLowerCase())
-            return { email, role, sent: false, reason: "You cannot invite your own account" };
-          if (distinctEmails.filter((candidate) => candidate === email).length > 1)
-            return { email, role, sent: false, reason: "This address appears more than once" };
-          const existingUser = await UserModel.findOne({ email }).select("_id").lean();
-          if (
-            existingUser &&
-            (slate.ownerId === existingUser._id.toString() ||
-              slate.collaborators.some((person) => person.userId === existingUser._id.toString()))
-          ) {
-            return { email, role, sent: false, reason: "This person already has access" };
-          }
-          const token = randomBytes(32).toString("base64url");
-          const tokenHash = createHash("sha256").update(token).digest("hex");
-          const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-          try {
-            // Replace an older pending invite so only the newest emailed link can be used.
-            await SlateInvitationModel.findOneAndUpdate(
-              { slateId: params.slateId, email },
-              {
-                $set: {
-                  tokenHash,
-                  expiresAt,
-                  invitedBy: currentUserId,
+      const results = await runAuditedAction(
+        req,
+        {
+          action: "slate.invitations_sent",
+          actorId: currentUserId,
+          resourceType: "slate",
+          resourceId: params.slateId,
+          details: {
+            requestedCount: body.length,
+            roles: body.map(({ role }) => role),
+          },
+        },
+        () =>
+          Promise.all(
+            body.map(async ({ email, role }) => {
+              if (email === req.user?.email.toLowerCase())
+                return { email, role, sent: false, reason: "You cannot invite your own account" };
+              if (distinctEmails.filter((candidate) => candidate === email).length > 1)
+                return { email, role, sent: false, reason: "This address appears more than once" };
+              const existingUser = await UserModel.findOne({ email }).select("_id").lean();
+              if (
+                existingUser &&
+                (slate.ownerId === existingUser._id.toString() ||
+                  slate.collaborators.some(
+                    (person) => person.userId === existingUser._id.toString(),
+                  ))
+              ) {
+                return { email, role, sent: false, reason: "This person already has access" };
+              }
+              const token = randomBytes(32).toString("base64url");
+              const tokenHash = createHash("sha256").update(token).digest("hex");
+              const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+              try {
+                // Replace an older pending invite so only the newest emailed link can be used.
+                await SlateInvitationModel.findOneAndUpdate(
+                  { slateId: params.slateId, email },
+                  {
+                    $set: {
+                      tokenHash,
+                      expiresAt,
+                      invitedBy: currentUserId,
+                      role,
+                      acceptedAt: null,
+                      deliveryFailed: false,
+                    },
+                  },
+                  { upsert: true, new: true, setDefaultsOnInsert: true },
+                );
+                await sendSlateInvitation(
+                  email,
+                  slate.title,
+                  `${env.WEB_APP_URL}/invitations/${token}`,
+                );
+                return { email, role, sent: true };
+              } catch {
+                await SlateInvitationModel.updateOne(
+                  { slateId: params.slateId, email, tokenHash },
+                  { $set: { deliveryFailed: true } },
+                );
+                return {
+                  email,
                   role,
-                  acceptedAt: null,
-                  deliveryFailed: false,
-                },
-              },
-              { upsert: true, new: true, setDefaultsOnInsert: true },
-            );
-            await sendSlateInvitation(
-              email,
-              slate.title,
-              `${env.WEB_APP_URL}/invitations/${token}`,
-            );
-            return { email, role, sent: true };
-          } catch {
-            await SlateInvitationModel.updateOne(
-              { slateId: params.slateId, email, tokenHash },
-              { $set: { deliveryFailed: true } },
-            );
-            return { email, role, sent: false, reason: "The invitation email could not be sent" };
-          }
-        }),
+                  sent: false,
+                  reason: "The invitation email could not be sent",
+                };
+              }
+            }),
+          ),
+        (sentResults) => {
+          const sentCount = sentResults.filter((item) => item.sent).length;
+          return {
+            outcome: sentCount === sentResults.length ? "succeeded" : "partial",
+            details: { sentCount, failedCount: sentResults.length - sentCount },
+          };
+        },
       );
-      res.json({ results });
+      sendSuccess(res, 200, "Invitations processed.", { results });
     },
   ),
 );
@@ -207,11 +236,39 @@ slatesRouter.post(
         expiresAt: { $gt: new Date() },
       });
       if (!invitation) {
-        sendGeneralError(res, 404, "Invitation expired or already used");
+        await runAuditedAction(
+          req,
+          {
+            action: "slate.access_denied",
+            actorId: req.user?.id ?? null,
+            resourceType: "slate",
+            details: { reason: "invitation_invalid_or_expired" },
+          },
+          async () => {
+            throw new HttpError(404, "Invitation expired or already used");
+          },
+        );
         return;
       }
       if (invitation.email !== req.user?.email.toLowerCase()) {
-        sendGeneralError(res, 403, "Sign in with the invited email address");
+        await runAuditedAction(
+          req,
+          {
+            action: "slate.access_denied",
+            actorId: req.user?.id ?? null,
+            resourceType: "slate",
+            resourceId: invitation.slateId.toString(),
+            details: { reason: "invitation_email_mismatch" },
+          },
+          async () => {
+            throw new HttpError(403, "Sign in with the invited email address");
+          },
+        );
+        return;
+      }
+      const acceptingUserId = req.user?.id;
+      if (!acceptingUserId) {
+        sendGeneralError(res, 401, "Authentication required");
         return;
       }
       const slate = await SlateModel.findById(invitation.slateId).select("ownerId collaborators");
@@ -219,34 +276,52 @@ slatesRouter.post(
         sendGeneralError(res, 404, "Slate not found");
         return;
       }
-      if (
-        slate.ownerId !== req.user.id &&
-        !slate.collaborators.some((person) => person.userId === req.user?.id)
-      ) {
-        // The conditional update makes repeated or simultaneous clicks add at most one membership.
-        await SlateModel.updateOne(
-          {
-            _id: slate._id,
-            ownerId: { $ne: req.user.id },
-            "collaborators.userId": { $ne: req.user.id },
-          },
-          { $push: { collaborators: { userId: req.user.id, role: invitation.role } } },
-        );
-      }
-      const accepted = await SlateInvitationModel.findOneAndUpdate(
+      const slateId = invitation.slateId.toString();
+      const previousRole =
+        slate.ownerId === acceptingUserId
+          ? "owner"
+          : (slate.collaborators.find((person) => person.userId === acceptingUserId)?.role ?? null);
+      await runAuditedAction(
+        req,
         {
-          _id: invitation._id,
-          acceptedAt: null,
-          expiresAt: { $gt: new Date() },
-          deliveryFailed: false,
+          action: "slate.invitation_accepted",
+          actorId: acceptingUserId,
+          resourceType: "slate",
+          resourceId: slateId,
+          before: { collaboratorRole: previousRole },
+          details: { invitedRole: invitation.role },
         },
-        { $set: { acceptedAt: new Date() } },
+        async () => {
+          if (
+            slate.ownerId !== acceptingUserId &&
+            !slate.collaborators.some((person) => person.userId === acceptingUserId)
+          ) {
+            // The conditional update makes repeated or simultaneous clicks add at most one membership.
+            await SlateModel.updateOne(
+              {
+                _id: slate._id,
+                ownerId: { $ne: acceptingUserId },
+                "collaborators.userId": { $ne: acceptingUserId },
+              },
+              { $push: { collaborators: { userId: acceptingUserId, role: invitation.role } } },
+            );
+          }
+          const accepted = await SlateInvitationModel.findOneAndUpdate(
+            {
+              _id: invitation._id,
+              acceptedAt: null,
+              expiresAt: { $gt: new Date() },
+              deliveryFailed: false,
+            },
+            { $set: { acceptedAt: new Date() } },
+          );
+          if (!accepted) throw new HttpError(409, "This invitation was already accepted");
+        },
+        () => ({ after: { collaboratorRole: invitation.role, invitationAccepted: true } }),
       );
-      if (!accepted) {
-        sendGeneralError(res, 409, "This invitation was already accepted");
-        return;
-      }
-      res.json({ slateId: invitation.slateId.toString() });
+      sendSuccess(res, 200, "Invitation accepted.", {
+        slateId: invitation.slateId.toString(),
+      });
     },
   ),
 );
@@ -404,7 +479,7 @@ slatesRouter.get(
       // The cursor is just a bookmark for the final slate in this page. Base64 makes
       // it convenient to pass as a URL value; it is not encryption or a secret.
       const last = slates.at(-1);
-      res.json({
+      sendSuccess(res, 200, "Slates retrieved.", {
         slates: payload,
         nextCursor:
           hasMore && last
@@ -433,13 +508,23 @@ slatesRouter.post(
         return;
       }
 
-      const created = await SlateModel.create({
-        title: body.title ?? "Untitled Slate",
-        ownerId: userId,
-        isPublic: body.isPublic ?? true,
-      });
+      const created = await runAuditedAction(
+        req,
+        { action: "slate.created", actorId: userId, resourceType: "slate" },
+        () =>
+          SlateModel.create({
+            title: body.title ?? "Untitled Slate",
+            ownerId: userId,
+            isPublic: body.isPublic ?? true,
+          }),
+        (slate) => ({
+          resourceId: slate._id.toString(),
+          statusCode: 201,
+          after: { title: slate.title, isPublic: slate.isPublic },
+        }),
+      );
 
-      res.status(201).json({
+      sendSuccess(res, 201, "Slate created.", {
         slate: {
           id: created._id.toString(),
           title: created.title,
@@ -468,16 +553,22 @@ slatesRouter.get(
         return;
       }
 
-      const [slate, nodes, edges, star] = await Promise.all([
-        SlateModel.findById(slateId).lean(),
-        CanvasNodeModel.find({ slateId }).lean(),
-        CanvasEdgeModel.find({ slateId }).lean(),
-        // This lookup is personal; it doesn't read or change shared slate data.
-        SlateStarModel.exists({ slateId, userId }),
-      ]);
+      const slate = await SlateModel.findById(slateId).lean();
 
       if (!slate) {
-        sendGeneralError(res, 404, "Slate not found");
+        await runAuditedAction(
+          req,
+          {
+            action: "slate.access_denied",
+            actorId: userId,
+            resourceType: "slate",
+            resourceId: slateId,
+            details: { reason: "slate_not_found" },
+          },
+          async () => {
+            throw new HttpError(404, "Slate not found");
+          },
+        );
         return;
       }
 
@@ -487,11 +578,31 @@ slatesRouter.get(
         slate.ownerId !== userId &&
         !slate.collaborators.some((collaborator) => collaborator.userId === userId)
       ) {
-        sendGeneralError(res, 403, "Access denied");
+        await runAuditedAction(
+          req,
+          {
+            action: "slate.access_denied",
+            actorId: userId,
+            resourceType: "slate",
+            resourceId: slateId,
+            details: { reason: "private_slate_not_shared" },
+          },
+          async () => {
+            throw new HttpError(403, "Access denied");
+          },
+        );
         return;
       }
 
-      res.json({
+      // Check access before loading nodes and edges so private canvas data is never read for a denial.
+      const [nodes, edges, star] = await Promise.all([
+        CanvasNodeModel.find({ slateId }).lean(),
+        CanvasEdgeModel.find({ slateId }).lean(),
+        // This lookup is personal; it doesn't read or change shared slate data.
+        SlateStarModel.exists({ slateId, userId }),
+      ]);
+
+      sendSuccess(res, 200, "Slate retrieved.", {
         slate: {
           id: slate._id.toString(),
           title: slate.title,
@@ -537,13 +648,27 @@ slatesRouter.post(
         return;
       }
 
-      // Save only this user's star. Keeping it in a separate collection avoids changing the slate's updatedAt.
-      await SlateStarModel.updateOne(
-        { slateId: params.slateId, userId },
-        { $setOnInsert: { slateId: params.slateId, userId } },
-        { upsert: true },
+      const wasStarred = Boolean(await SlateStarModel.exists({ slateId: params.slateId, userId }));
+      await runAuditedAction(
+        req,
+        {
+          action: "slate.starred",
+          actorId: userId,
+          resourceType: "slate",
+          resourceId: params.slateId,
+          before: { starred: wasStarred },
+        },
+        async () => {
+          // Save only this user's star, without changing the shared slate's updatedAt.
+          await SlateStarModel.updateOne(
+            { slateId: params.slateId, userId },
+            { $setOnInsert: { slateId: params.slateId, userId } },
+            { upsert: true },
+          );
+        },
+        () => ({ after: { starred: true }, details: { changed: !wasStarred } }),
       );
-      res.json({ starred: true });
+      sendSuccess(res, 200, "Slate starred.", { starred: true });
     },
     [requireSlateAccess("viewer")],
   ),
@@ -561,9 +686,23 @@ slatesRouter.delete(
         return;
       }
 
-      // Remove only this user's star; collaborators' stars are left alone.
-      await SlateStarModel.deleteOne({ slateId: params.slateId, userId });
-      res.json({ starred: false });
+      const wasStarred = Boolean(await SlateStarModel.exists({ slateId: params.slateId, userId }));
+      await runAuditedAction(
+        req,
+        {
+          action: "slate.unstarred",
+          actorId: userId,
+          resourceType: "slate",
+          resourceId: params.slateId,
+          before: { starred: wasStarred },
+        },
+        async () => {
+          // Remove only this user's star; collaborators' stars are left alone.
+          await SlateStarModel.deleteOne({ slateId: params.slateId, userId });
+        },
+        () => ({ after: { starred: false }, details: { changed: wasStarred } }),
+      );
+      sendSuccess(res, 200, "Slate unstarred.", { starred: false });
     },
     [requireSlateAccess("viewer")],
   ),
@@ -575,42 +714,70 @@ slatesRouter.patch(
     z.object({ params: SlateIdParamsSchema, body: UpdateSlateInputSchema }),
     (req) => ({ params: req.params, body: req.body }),
     async (req, res, { params, body }) => {
-      const current = await SlateModel.findById(params.slateId).select("ownerId").lean();
-      if (!current) {
-        sendGeneralError(res, 404, "Slate not found");
-        return;
-      }
-      // Editors may rename a slate, but only its owner controls whether the link is public.
-      if (body.isPublic !== undefined && current.ownerId !== req.user?.id) {
-        sendGeneralError(res, 403, "Only the slate owner can change visibility");
-        return;
-      }
-      const updated = await SlateModel.findByIdAndUpdate(
-        params.slateId,
-        { $set: body },
-        { new: true },
-      ).lean();
-
-      if (!updated) {
-        sendGeneralError(res, 404, "Slate not found");
-        return;
-      }
-
       const userId = req.user?.id;
       if (!userId) {
         sendGeneralError(res, 401, "Authentication required");
         return;
       }
-      // The response still includes the current user's star status alongside the slate title.
-      const star = await SlateStarModel.exists({ slateId: updated._id, userId });
 
-      res.json({
+      const current = await SlateModel.findById(params.slateId)
+        .select("ownerId title isPublic")
+        .lean();
+      if (!current) {
+        sendGeneralError(res, 404, "Slate not found");
+        return;
+      }
+      // Editors may rename a slate, but only its owner controls whether the link is public.
+      if (body.isPublic !== undefined && current.ownerId !== userId) {
+        await runAuditedAction(
+          req,
+          {
+            action: "slate.access_denied",
+            actorId: userId,
+            resourceType: "slate",
+            resourceId: params.slateId,
+            details: { reason: "only_owner_can_change_visibility" },
+          },
+          async () => {
+            throw new HttpError(403, "Only the slate owner can change visibility");
+          },
+        );
+        return;
+      }
+      const slateUpdate = await runAuditedAction(
+        req,
+        {
+          action: "slate.updated",
+          actorId: userId,
+          resourceType: "slate",
+          resourceId: params.slateId,
+          before: { title: current.title, isPublic: current.isPublic ?? true },
+          details: { changedFields: Object.keys(body) },
+        },
+        async () => {
+          const updatedSlate = await SlateModel.findByIdAndUpdate(
+            params.slateId,
+            { $set: body },
+            { new: true },
+          ).lean();
+          if (!updatedSlate) throw new HttpError(404, "Slate not found");
+
+          // Include the current user's star state in the response without changing shared slate data.
+          const starredByUser = await SlateStarModel.exists({ slateId: updatedSlate._id, userId });
+          return { updatedSlate, starredByUser };
+        },
+        ({ updatedSlate }) => ({
+          after: { title: updatedSlate.title, isPublic: updatedSlate.isPublic ?? true },
+        }),
+      );
+
+      sendSuccess(res, 200, "Slate updated.", {
         slate: {
-          id: updated._id.toString(),
-          title: updated.title,
-          isPublic: updated.isPublic ?? true,
-          starred: Boolean(star),
-          updatedAt: updated.updatedAt.toISOString(),
+          id: slateUpdate.updatedSlate._id.toString(),
+          title: slateUpdate.updatedSlate.title,
+          isPublic: slateUpdate.updatedSlate.isPublic ?? true,
+          starred: Boolean(slateUpdate.starredByUser),
+          updatedAt: slateUpdate.updatedSlate.updatedAt.toISOString(),
         },
       });
     },
@@ -634,17 +801,42 @@ slatesRouter.delete(
       }
 
       if (slate.ownerId !== userId) {
-        sendGeneralError(res, 403, "Only the slate owner can delete this board");
+        await runAuditedAction(
+          req,
+          {
+            action: "slate.access_denied",
+            actorId: userId ?? null,
+            resourceType: "slate",
+            resourceId: slateId,
+            details: { reason: "only_owner_can_delete" },
+          },
+          async () => {
+            throw new HttpError(403, "Only the slate owner can delete this board");
+          },
+        );
         return;
       }
 
-      await Promise.all([
-        SlateModel.findByIdAndDelete(slateId),
-        // Remove personal stars too, so no orphaned star records remain.
-        SlateStarModel.deleteMany({ slateId }),
-        CanvasNodeModel.deleteMany({ slateId }),
-        CanvasEdgeModel.deleteMany({ slateId }),
-      ]);
+      await runAuditedAction(
+        req,
+        {
+          action: "slate.deleted",
+          actorId: userId,
+          resourceType: "slate",
+          resourceId: slateId,
+          before: { title: slate.title, isPublic: slate.isPublic ?? true },
+        },
+        async () => {
+          await Promise.all([
+            SlateModel.findByIdAndDelete(slateId),
+            // Remove personal stars too, so no orphaned star records remain.
+            SlateStarModel.deleteMany({ slateId }),
+            CanvasNodeModel.deleteMany({ slateId }),
+            CanvasEdgeModel.deleteMany({ slateId }),
+          ]);
+        },
+        () => ({ statusCode: 204, after: { deleted: true } }),
+      );
 
       res.status(204).end();
     },

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { EmailInputSchema } from "#/auth";
 import {
   MAX_EDGE_LABEL_LENGTH,
   MAX_NOTE_CONTENT_LENGTH,
@@ -50,7 +51,8 @@ export const CanvasEdgeSchema = z.object({
   slateId: z.string().min(1),
   sourceNodeId: z.string().min(1),
   targetNodeId: z.string().min(1),
-  label: z.string().max(MAX_EDGE_LABEL_LENGTH).optional(),
+  // Match the database model, which also removes surrounding spaces from edge labels.
+  label: z.string().trim().max(MAX_EDGE_LABEL_LENGTH).optional(),
 });
 
 export type CanvasEdge = z.infer<typeof CanvasEdgeSchema>;
@@ -82,7 +84,8 @@ export const UpdateSlateInputSchema = z
 export type UpdateSlateInput = z.infer<typeof UpdateSlateInputSchema>;
 
 export const InviteSlateCollaboratorSchema = z.object({
-  email: z.email().transform((email) => email.toLowerCase()),
+  // Use the same trim-and-lowercase rule as registration and login.
+  email: EmailInputSchema,
   role: z.enum(["editor", "viewer"]),
 });
 export type InviteSlateCollaborator = z.infer<typeof InviteSlateCollaboratorSchema>;

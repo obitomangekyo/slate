@@ -4,6 +4,7 @@ import { formatDistanceToNow } from "date-fns";
 import { NavArrowRight, Star } from "iconoir-react";
 import { useCallback, useMemo } from "react";
 import { Button } from "#/components/ui/button";
+import { Skeleton } from "#/components/ui/skeleton";
 import { useToggleStarredMutation } from "#/lib/slates";
 
 export function StarredSlateCard({ slate }: { slate: SlateSummary }) {
@@ -51,6 +52,26 @@ export function StarredSlateCard({ slate }: { slate: SlateSummary }) {
       >
         <Star className="size-3.5 fill-current" />
       </Button>
+    </article>
+  );
+}
+
+export function StarredSlateCardSkeleton() {
+  // Keep the loading placeholder the same height as a starred slate card.
+  return (
+    <article
+      aria-hidden="true"
+      className="border-line bg-paper-raised relative flex min-h-28 flex-col justify-center rounded-sm border p-3"
+    >
+      <div className="flex items-center gap-3">
+        <Skeleton className="size-9 shrink-0 rounded-xs" />
+        <div className="min-w-0 flex-1">
+          <Skeleton className="h-4 w-3/4" />
+          <Skeleton className="mt-2 h-3 w-1/2" />
+        </div>
+        <Skeleton className="size-4 shrink-0 rounded-full" />
+      </div>
+      <Skeleton className="absolute top-1 right-1 size-7 rounded-full" />
     </article>
   );
 }

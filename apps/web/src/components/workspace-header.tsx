@@ -11,11 +11,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "#/components/ui/dropdown-menu";
+import { Skeleton } from "#/components/ui/skeleton";
 import { useStepper } from "#/hooks/use-stepper";
 import { authQueryOptions, useLogoutMutation } from "#/lib/auth";
 
 export function WorkspaceHeader() {
-  const { data: user } = useQuery(authQueryOptions);
+  const { data: user, isPending: isUserPending } = useQuery(authQueryOptions);
   const logout = useLogoutMutation();
   const navigate = useNavigate();
   const logoutAndReturn = async () => {
@@ -68,11 +69,17 @@ export function WorkspaceHeader() {
         </div>
         {/* Keep profile details and account actions together in one small menu. */}
         <DropdownMenu>
+          {/* Wait for the auth check before opening a menu with user-specific details. */}
           <DropdownMenuTrigger
             className="border-line bg-paper text-ink hover:bg-paper-raised flex size-9 items-center justify-center rounded-full border text-sm font-semibold"
-            aria-label="Account menu"
+            aria-label={isUserPending ? "Loading account" : "Account menu"}
+            disabled={isUserPending}
           >
-            {user?.name?.slice(0, 1).toUpperCase() ?? "?"}
+            {isUserPending ? (
+              <Skeleton className="size-5 rounded-full" />
+            ) : (
+              (user?.name?.slice(0, 1).toUpperCase() ?? "?")
+            )}
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" sideOffset={8}>
             <DropdownMenuGroup>

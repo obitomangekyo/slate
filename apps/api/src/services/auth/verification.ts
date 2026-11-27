@@ -71,10 +71,13 @@ export async function registerWithEmail(input: RegisterInput) {
   }
 
   return {
-    challengeId: verification.challengeId,
-    email: created.email,
-    expiresAt: verification.expiresAt.toISOString(),
-    resendAvailableAt: resendAvailableAt.toISOString(),
+    userId: created._id.toString(),
+    verification: {
+      challengeId: verification.challengeId,
+      email: created.email,
+      expiresAt: verification.expiresAt.toISOString(),
+      resendAvailableAt: resendAvailableAt.toISOString(),
+    },
   };
 }
 
@@ -207,5 +210,5 @@ export async function resendVerificationCode(challengeId: string) {
   if (!updated) throw new HttpError(429, "Please wait before requesting another code");
 
   await sendVerificationCode(updated.email, verification.code);
-  return { resendAvailableAt: resendAvailableAt.toISOString() };
+  return { userId: updated._id.toString(), resendAvailableAt: resendAvailableAt.toISOString() };
 }

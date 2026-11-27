@@ -1,5 +1,6 @@
 import type {
   ApiErrorResponse,
+  ApiSuccessResponse,
   AuthUser,
   LoginInput,
   RegisterInput,
@@ -16,19 +17,20 @@ import type {
   VerifyEmailInput,
 } from "#/types/auth";
 
+// Unwrap the shared API envelope here so the rest of the app works with auth data directly.
 export const authQueryOptions = queryOptions({
   queryKey: ["auth", "me"] as const,
   // The browser must perform this check so it can send the path-scoped refresh cookie.
   queryFn: async () => {
     try {
-      const { data } = await api.get<{ user: AuthUser }>("/auth/me");
-      return data.user;
+      const { data } = await api.get<ApiSuccessResponse<{ user: AuthUser }>>("/auth/me");
+      return data.data.user;
     } catch (error) {
       if (isAxiosError(error) && error.response?.status === 401) {
         try {
           await api.post("/auth/refresh");
-          const { data } = await api.get<{ user: AuthUser }>("/auth/me");
-          return data.user;
+          const { data } = await api.get<ApiSuccessResponse<{ user: AuthUser }>>("/auth/me");
+          return data.data.user;
         } catch (refreshError) {
           if (isAxiosError(refreshError) && refreshError.response?.status === 401) return null;
           throw refreshError;
@@ -45,8 +47,8 @@ export function useLoginMutation() {
 
   return useMutation<AuthUser, AxiosError<ApiErrorResponse>, LoginInput>({
     mutationFn: async (input) => {
-      const { data } = await api.post<{ user: AuthUser }>("/auth/login", input);
-      return data.user;
+      const { data } = await api.post<ApiSuccessResponse<{ user: AuthUser }>>("/auth/login", input);
+      return data.data.user;
     },
     onSuccess: (user) => {
       // Update the shared current-user cache so protected routes see the new session.
@@ -64,11 +66,13 @@ export function useRegisterMutation() {
     unknown
   >({
     mutationFn: async (input) => {
-      const { data } = await api.post<{
-        verification: EmailVerificationChallenge;
-      }>("/auth/register", input);
+      const { data } = await api.post<
+        ApiSuccessResponse<{
+          verification: EmailVerificationChallenge;
+        }>
+      >("/auth/register", input);
 
-      return data.verification;
+      return data.data.verification;
     },
   });
 }
@@ -78,9 +82,12 @@ export function useVerifyEmailMutation() {
 
   return useMutation<AuthUser, AxiosError<ApiErrorResponse>, VerifyEmailInput, unknown>({
     mutationFn: async (input) => {
-      const { data } = await api.post<{ user: AuthUser }>("/auth/verify-email", input);
+      const { data } = await api.post<ApiSuccessResponse<{ user: AuthUser }>>(
+        "/auth/verify-email",
+        input,
+      );
 
-      return data.user;
+      return data.data.user;
     },
     onSuccess: (user) => {
       // Verification also signs in, so store that user in the same shared cache.
@@ -98,11 +105,11 @@ export function useResendEmailVerificationMutation() {
     unknown
   >({
     mutationFn: async (input) => {
-      const { data } = await api.post<ResendEmailVerificationResponse>(
+      const { data } = await api.post<ApiSuccessResponse<ResendEmailVerificationResponse>>(
         "/auth/verify-email/resend",
         input,
       );
-      return data;
+      return data.data;
     },
   });
 }
@@ -141,8 +148,8 @@ export function handleFormApiError<TFieldValues extends FieldValues>(
   // Put field messages beside their inputs; show a toast for errors with no field to attach to.
   const payload = isAxiosError<ApiErrorResponse>(error) ? error.response?.data : undefined;
 
-  if (payload?.kind === "field") {
-    for (const [field, message] of Object.entries(payload.fieldErrors)) {
+  if (payload?.data.kind === "field") {
+    for (const [field, message] of Object.entries(payload.data.fieldErrors)) {
       setError(field as Path<TFieldValues>, { type: "server", message });
     }
     return;

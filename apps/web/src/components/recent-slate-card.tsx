@@ -5,6 +5,7 @@ import { NavArrowRight, Star } from "iconoir-react";
 import type { CSSProperties } from "react";
 import { useCallback, useMemo } from "react";
 import { Button } from "#/components/ui/button";
+import { Skeleton } from "#/components/ui/skeleton";
 import { useToggleStarredMutation } from "#/lib/slates";
 
 const dotGridStyle = {
@@ -95,6 +96,30 @@ export function RecentSlateCard({ slate }: { slate: SlateSummary }) {
       >
         <Star className={slate.starred ? "fill-citron text-citron" : ""} />
       </Button>
+    </article>
+  );
+}
+
+export function RecentSlateCardSkeleton() {
+  // Match the real card's shape so the grid doesn't jump when slate data arrives.
+  return (
+    <article
+      aria-hidden="true"
+      className="border-line bg-paper-raised flex min-h-56 flex-col rounded-sm border"
+    >
+      <div className="bg-paper border-line relative h-32 overflow-hidden rounded-t-[inherit] border-b">
+        <Skeleton className="absolute top-5 left-[12%] h-7 w-20 -rotate-2 rounded-xs" />
+        <Skeleton className="absolute top-10 left-[48%] h-8 w-24 rotate-1 rounded-xs" />
+        <Skeleton className="absolute top-2 right-2 size-7 rounded-full" />
+        <Skeleton className="absolute right-3 bottom-2 h-4 w-12" />
+      </div>
+      <div className="flex flex-1 items-start justify-between gap-3 p-3">
+        <div className="min-w-0 flex-1">
+          <Skeleton className="h-4 w-3/4" />
+          <Skeleton className="mt-2 h-3 w-1/2" />
+        </div>
+        <Skeleton className="mt-0.5 size-4 rounded-full" />
+      </div>
     </article>
   );
 }

@@ -1,18 +1,15 @@
 import { z } from "zod";
 
-// Every API failure is either tied to form fields or is a general message.
-export const ApiErrorSchema = z.discriminatedUnion("kind", [
+// Keep field-specific and general failure details inside `data`, so every error has one shape.
+const ApiErrorDataSchema = z.discriminatedUnion("kind", [
   z.object({
-    // Field errors map input names to the message the form should display there.
     kind: z.literal("field"),
-    message: z.string(),
     fieldErrors: z.record(z.string(), z.string()),
   }),
   z.object({
-    // General errors can carry a code and verification details for special flows.
     kind: z.literal("general"),
-    message: z.string(),
     code: z.literal("EMAIL_VERIFICATION_REQUIRED").optional(),
+    details: z.record(z.string(), z.unknown()).optional(),
     verification: z
       .object({
         challengeId: z.string(),
@@ -24,4 +21,18 @@ export const ApiErrorSchema = z.discriminatedUnion("kind", [
   }),
 ]);
 
+export const ApiErrorSchema = z.object({
+  success: z.literal(false),
+  message: z.string(),
+  data: ApiErrorDataSchema,
+});
+
 export type ApiErrorResponse = z.infer<typeof ApiErrorSchema>;
+
+// `success` describes this request, not the account or resource's overall state.
+// For example, registration can succeed while the new account still needs email verification.
+export type ApiSuccessResponse<TData> = {
+  success: true;
+  message: string;
+  data: TData;
+};

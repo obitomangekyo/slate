@@ -1,4 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { InviteSlateCollaboratorsInputSchema } from "@slate/shared";
 import { useParams } from "@tanstack/react-router";
 import { EditPencil, Eye, Plus, Xmark } from "iconoir-react";
 import { type ComponentProps, type ReactElement, useCallback, useState } from "react";
@@ -34,17 +35,8 @@ import { RadioGroup, RadioGroupItem } from "#/components/ui/radio-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "#/components/ui/tooltip";
 import { useInviteCollaboratorsMutation } from "#/lib/slates";
 
-const InviteFormSchema = z.object({
-  collaborators: z
-    .array(
-      z.object({
-        email: z.email("Enter a valid email address."),
-        role: z.enum(["editor", "viewer"]).default("viewer"),
-      }),
-    )
-    .min(1)
-    .max(20),
-});
+// React Hook Form keeps the array under `collaborators`; the shared schema normalizes each email.
+const InviteFormSchema = z.object({ collaborators: InviteSlateCollaboratorsInputSchema });
 type InviteFormInput = z.input<typeof InviteFormSchema>;
 type InviteForm = z.output<typeof InviteFormSchema>;
 

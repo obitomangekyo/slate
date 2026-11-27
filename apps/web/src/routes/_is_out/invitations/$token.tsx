@@ -1,3 +1,4 @@
+import type { ApiSuccessResponse } from "@slate/shared";
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useMemo } from "react";
@@ -18,10 +19,11 @@ function invitationQueryOptions(token: string) {
   return {
     queryKey: ["invitations", token] as const,
     queryFn: async () => {
-      const { data } = await api.get<{ invitation: InvitationPreview }>(
+      // Cache the invitation itself, not the common API envelope around it.
+      const { data } = await api.get<ApiSuccessResponse<{ invitation: InvitationPreview }>>(
         `/slates/invitations/${token}`,
       );
-      return data.invitation;
+      return data.data.invitation;
     },
   };
 }
@@ -43,8 +45,10 @@ function InvitationPage() {
   const { data: user } = useSuspenseQuery(authQueryOptions);
   const acceptInvite = useMutation({
     mutationFn: async () => {
-      const { data } = await api.post<{ slateId: string }>(`/slates/invitations/${token}/accept`);
-      return data.slateId;
+      const { data } = await api.post<ApiSuccessResponse<{ slateId: string }>>(
+        `/slates/invitations/${token}/accept`,
+      );
+      return data.data.slateId;
     },
     onSuccess: async (slateId) => {
       toastManager.add({ type: "success", title: "You joined the slate" });

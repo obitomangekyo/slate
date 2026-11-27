@@ -51,7 +51,7 @@ function PasswordInput({ strengthScore, strengthLabel, ...inputProps }: Props) {
         )}
       </InputGroupAddon>
       <InputGroupInput {...inputProps} type={visible ? "text" : "password"} />
-      <InputGroupAddon align="inline-end" className="pr-1.5">
+      <InputGroupAddon align="inline-end">
         <InputGroupButton
           aria-label={visible ? "Hide password" : "Show password"}
           aria-pressed={visible}

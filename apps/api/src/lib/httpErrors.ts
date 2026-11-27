@@ -1,8 +1,19 @@
-import type { ApiErrorResponse } from "@slate/shared";
+import type { ApiErrorResponse, ApiSuccessResponse } from "@slate/shared";
 import type { Response } from "express";
 import type { ZodError } from "zod";
 
-type GeneralApiError = Extract<ApiErrorResponse, { kind: "general" }>;
+type GeneralApiError = Extract<ApiErrorResponse["data"], { kind: "general" }>;
+
+// Keep successful JSON bodies predictable; the HTTP status still carries the protocol status.
+// `success` means this operation completed, not that every related business step is finished.
+export function sendSuccess<TData>(res: Response, status: number, message: string, data: TData) {
+  const payload: ApiSuccessResponse<TData> = {
+    success: true,
+    message,
+    data,
+  };
+  res.status(status).json(payload);
+}
 
 export function sendFieldError(
   res: Response,
@@ -12,9 +23,9 @@ export function sendFieldError(
 ) {
   // Field errors have a stable shape that the web form can attach to inputs.
   const payload: ApiErrorResponse = {
-    kind: "field",
+    success: false,
     message,
-    fieldErrors,
+    data: { kind: "field", fieldErrors },
   };
   res.status(status).json(payload);
 }
@@ -39,13 +50,14 @@ export function sendGeneralError(
   res: Response,
   status: number,
   message: string,
-  extra: Pick<GeneralApiError, "code" | "verification"> = {},
+  extra: Pick<GeneralApiError, "code" | "details" | "verification"> = {},
 ) {
   // General errors are for messages that do not belong to one specific form field.
+  // Extra details stay under data too, so clients can handle every failure the same way.
   const payload: ApiErrorResponse = {
-    kind: "general",
+    success: false,
     message,
-    ...extra,
+    data: { kind: "general", ...extra },
   };
   res.status(status).json(payload);
 }

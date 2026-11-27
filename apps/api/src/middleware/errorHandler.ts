@@ -3,12 +3,21 @@ import { JOSEError } from "jose/errors";
 import { Error as MongooseError, mongo } from "mongoose";
 import { clearAuthCookies } from "#/lib/auth";
 import { HttpError, sendGeneralError } from "#/lib/httpErrors";
+import { AuditPersistenceError } from "#/services/audit";
 import { logger } from "#/utils/logger";
 
 export function errorHandler(error: unknown, _req: Request, res: Response, next: NextFunction) {
   // Express cannot send a second response after headers have already gone out.
   if (res.headersSent) {
     next(error);
+    return;
+  }
+
+  if (error instanceof AuditPersistenceError) {
+    // Tell the caller whether work was blocked or may need checking, and include a support ID.
+    sendGeneralError(res, 503, error.message, {
+      details: { requestId: error.requestId, phase: error.phase },
+    });
     return;
   }
 

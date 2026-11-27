@@ -2,9 +2,10 @@ import type { CollaboratorRole } from "@slate/shared";
 import type { NextFunction, Request, Response } from "express";
 import { Types } from "mongoose";
 import { ACCESS_COOKIE_NAME, verifyAccessToken } from "#/lib/auth";
-import { sendGeneralError } from "#/lib/httpErrors";
+import { HttpError, sendGeneralError } from "#/lib/httpErrors";
 import { SlateModel } from "#/models/slate";
 import { UserModel } from "#/models/user";
+import { runAuditedAction } from "#/services/audit";
 
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
   // Access tokens arrive in an HTTP-only cookie, not in browser-readable storage.
@@ -50,7 +51,19 @@ export function requireSlateAccess(minRole: CollaboratorRole) {
     // Check access against the saved slate so a client cannot grant itself a role.
     const slate = await SlateModel.findById(slateId).lean();
     if (!slate) {
-      sendGeneralError(res, 404, "Slate not found");
+      await runAuditedAction(
+        req,
+        {
+          action: "slate.access_denied",
+          actorId: userId,
+          resourceType: "slate",
+          resourceId: slateId,
+          details: { reason: "slate_not_found" },
+        },
+        async () => {
+          throw new HttpError(404, "Slate not found");
+        },
+      );
       return;
     }
 
@@ -62,13 +75,37 @@ export function requireSlateAccess(minRole: CollaboratorRole) {
 
     const collaborator = slate.collaborators.find((c) => c.userId === userId);
     if (!collaborator) {
-      sendGeneralError(res, 403, "Access denied");
+      await runAuditedAction(
+        req,
+        {
+          action: "slate.access_denied",
+          actorId: userId,
+          resourceType: "slate",
+          resourceId: slateId,
+          details: { requiredRole: minRole, reason: "not_a_collaborator" },
+        },
+        async () => {
+          throw new HttpError(403, "Access denied");
+        },
+      );
       return;
     }
 
     // Viewers may read a slate, but only editors may change it.
     if (minRole === "editor" && collaborator.role !== "editor") {
-      sendGeneralError(res, 403, "Editor permissions required");
+      await runAuditedAction(
+        req,
+        {
+          action: "slate.access_denied",
+          actorId: userId,
+          resourceType: "slate",
+          resourceId: slateId,
+          details: { requiredRole: minRole, currentRole: collaborator.role },
+        },
+        async () => {
+          throw new HttpError(403, "Editor permissions required");
+        },
+      );
       return;
     }
 

@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { StarredSlateCard } from "#/components/starred-slate-card";
+import { Star } from "iconoir-react";
+import { type ComponentProps, useCallback, useEffect, useMemo, useState } from "react";
+import { StarredSlateCard, StarredSlateCardSkeleton } from "#/components/starred-slate-card";
 import { Alert, AlertDescription, AlertTitle } from "#/components/ui/alert";
 import { Button } from "#/components/ui/button";
 import type { CarouselApi } from "#/components/ui/carousel";
@@ -10,10 +11,21 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "#/components/ui/carousel";
-import { Skeleton } from "#/components/ui/skeleton";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "#/components/ui/empty";
 import { useSlatePagesQuery } from "#/lib/slates";
 
-const carouselOptions = { align: "start", containScroll: "trimSnaps" } as const;
+const carouselOptions = { align: "start", containScroll: "trimSnaps" } satisfies ComponentProps<
+  typeof Carousel
+>["opts"];
+
+const starredSkeletonKeys = ["starred-1", "starred-2", "starred-3", "starred-4", "starred-5"];
+const nextStarredSkeletonKeys = ["more-starred-1", "more-starred-2", "more-starred-3"];
 
 export function HomeStarredSection() {
   const query = useSlatePagesQuery({ starred: true });
@@ -71,7 +83,7 @@ export function HomeStarredSection() {
               {slates.map((slate) => (
                 <CarouselItem
                   key={slate.id}
-                  className="basis-[88%] pl-3 sm:basis-[48%] lg:basis-[32%] 2xl:basis-[24%]"
+                  className="basis-2/3 pl-3 sm:basis-2/5 lg:basis-28/100 2xl:basis-22/100"
                 >
                   <StarredSlateCard slate={slate} />
                 </CarouselItem>
@@ -79,9 +91,15 @@ export function HomeStarredSection() {
             </CarouselContent>
           </Carousel>
         ) : (
-          <p className="border-line bg-paper-raised text-muted rounded-sm border border-dashed px-4 py-3 text-sm">
-            No starred slates yet.
-          </p>
+          <Empty className="gap-2 py-5">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <Star aria-hidden="true" />
+              </EmptyMedia>
+              <EmptyTitle>No starred slates yet</EmptyTitle>
+              <EmptyDescription>Star a slate to keep it close at hand.</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         )
       ) : query.error ? (
         <Alert variant="destructive">
@@ -91,9 +109,38 @@ export function HomeStarredSection() {
             Try again
           </Button>
         </Alert>
+      ) : query.isPending ? (
+        <div>
+          {/* Announce loading once; the decorative cards below are hidden from screen readers. */}
+          <output className="sr-only">Loading starred slates...</output>
+          <div aria-hidden="true" className="flex gap-3 overflow-hidden">
+            {starredSkeletonKeys.map((key) => (
+              <div
+                key={key}
+                className="min-w-0 shrink-0 basis-2/3 sm:basis-2/5 lg:basis-28/100 2xl:basis-22/100"
+              >
+                <StarredSlateCardSkeleton />
+              </div>
+            ))}
+          </div>
+        </div>
       ) : null}
 
-      {query.isFetchingNextPage && <Skeleton className="mt-3 h-24" />}
+      {query.isFetchingNextPage && (
+        <div className="mt-3">
+          <output className="sr-only">Loading more starred slates...</output>
+          <div aria-hidden="true" className="flex gap-3 overflow-hidden">
+            {nextStarredSkeletonKeys.map((key) => (
+              <div
+                key={key}
+                className="min-w-0 shrink-0 basis-2/3 sm:basis-2/5 lg:basis-28/100 2xl:basis-22/100"
+              >
+                <StarredSlateCardSkeleton />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {query.isFetchNextPageError && (
         <Alert variant="destructive" className="mt-3">
           <AlertTitle>Could not load more starred slates</AlertTitle>

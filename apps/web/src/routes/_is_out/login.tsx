@@ -56,12 +56,13 @@ function RouteComponent() {
   const [code, setCode] = useState("");
   const [resendMessage, setResendMessage] = useState<string | null>(null);
   const [resendAvailableAtOverride, setResendAvailableAtOverride] = useState<string | undefined>();
+  // A correct password for an unverified account is a failed login with a verification challenge.
   const loginError = loginMutation.error?.response?.data;
   const verification =
-    loginError?.kind === "general" &&
-    loginError.code === "EMAIL_VERIFICATION_REQUIRED" &&
-    loginError.verification
-      ? loginError.verification
+    loginError?.data.kind === "general" &&
+    loginError.data.code === "EMAIL_VERIFICATION_REQUIRED" &&
+    loginError.data.verification
+      ? loginError.data.verification
       : undefined;
   const resendCooldown = useEmailResendCooldown(
     resendAvailableAtOverride ?? verification?.resendAvailableAt,
@@ -90,9 +91,9 @@ function RouteComponent() {
       onError: (err) => {
         const data = err.response?.data;
         if (
-          data?.kind === "general" &&
-          data.code === "EMAIL_VERIFICATION_REQUIRED" &&
-          data.verification
+          data?.data.kind === "general" &&
+          data.data.code === "EMAIL_VERIFICATION_REQUIRED" &&
+          data.data.verification
         ) {
           setCode("");
           setResendMessage(null);

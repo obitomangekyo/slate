@@ -5,6 +5,8 @@ declare global {
   namespace Express {
     interface Request {
       user?: AuthUser;
+      // The request middleware assigns this ID before any route or audit work begins.
+      auditRequestId: string;
     }
   }
 }

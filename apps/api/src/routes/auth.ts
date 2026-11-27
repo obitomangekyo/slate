@@ -4,8 +4,10 @@ import { type CookieOptions, Router } from "express";
 import { z } from "zod";
 import { env } from "#/env";
 import { clearAuthCookies, REFRESH_COOKIE_NAME, setAuthCookies } from "#/lib/auth";
+import { sendSuccess } from "#/lib/httpErrors";
 import { requireAuth } from "#/middleware/auth";
 import { validateRequest } from "#/middleware/validateRequest";
+import { runAuditedAction } from "#/services/audit";
 import { authenticateGoogle } from "#/services/auth/google";
 import {
   createSession,
@@ -73,33 +75,52 @@ authRouter.get("/google/callback", async (req, res) => {
     return res.redirect(url.toString());
   };
 
-  // These one-time cookies should not survive the callback, whether it succeeds or fails.
+  // Never keep OAuth state or the verifier after the provider sends the browser back.
   res.clearCookie("google_oauth_state", { path: "/api/auth/google" });
   res.clearCookie("google_code_verifier", { path: "/api/auth/google" });
 
-  // Validate OAuth state before processing either a successful or failed response.
-  if (
-    typeof state !== "string" ||
-    !state ||
-    typeof storedState !== "string" ||
-    !storedState ||
-    state !== storedState
-  ) {
-    return redirectToLogin("oauth_state_mismatch");
-  }
+  const result = await runAuditedAction(
+    req,
+    {
+      action: "auth.google_callback",
+      resourceType: "user",
+      details: { provider: "google" },
+    },
+    async () => {
+      // Check OAuth state before trusting either a success or error callback from Google.
+      if (
+        typeof state !== "string" ||
+        !state ||
+        typeof storedState !== "string" ||
+        !storedState ||
+        state !== storedState
+      ) {
+        return { error: "oauth_state_mismatch" };
+      }
 
-  // Google can return an error instead of an authorization code.
-  if (providerError !== undefined) {
-    return redirectToLogin(
-      providerError === "access_denied" ? "oauth_access_denied" : "oauth_failed",
-    );
-  }
+      // Google can return an error instead of an authorization code.
+      if (providerError !== undefined) {
+        return {
+          error: providerError === "access_denied" ? "oauth_access_denied" : "oauth_failed",
+        };
+      }
 
-  if (typeof code !== "string" || !code || typeof codeVerifier !== "string" || !codeVerifier) {
-    return redirectToLogin("oauth_invalid_callback");
-  }
+      if (typeof code !== "string" || !code || typeof codeVerifier !== "string" || !codeVerifier) {
+        return { error: "oauth_invalid_callback" };
+      }
 
-  const result = await authenticateGoogle(code, codeVerifier);
+      return authenticateGoogle(code, codeVerifier);
+    },
+    (authResult) =>
+      "error" in authResult
+        ? { outcome: "failed", statusCode: 302, details: { reason: authResult.error } }
+        : {
+            actorId: authResult.session.authUser.id,
+            resourceId: authResult.session.authUser.id,
+            statusCode: 302,
+            after: { sessionIssued: true, emailVerified: true },
+          },
+  );
 
   if ("error" in result) {
     return redirectToLogin(result.error);
@@ -118,8 +139,20 @@ authRouter.post(
     (req) => ({ body: req.body }),
     async (_req, res, { body }) => {
       // Middleware has checked and normalized the registration form before this route runs.
-      const verification = await registerWithEmail(body);
-      res.status(201).json({ verification });
+      const registration = await runAuditedAction(
+        _req,
+        { action: "auth.register", resourceType: "user", details: { method: "email" } },
+        () => registerWithEmail(body),
+        ({ userId }) => ({
+          resourceId: userId,
+          statusCode: 201,
+          after: { emailVerified: false },
+        }),
+      );
+      // The email was sent successfully, but the account is not signed in until it is verified.
+      sendSuccess(res, 201, "Verification email sent.", {
+        verification: registration.verification,
+      });
     },
   ),
 );
@@ -135,10 +168,22 @@ authRouter.post(
       const { challengeId, code } = body;
 
       // Verification creates a normal signed-in session as soon as the code is accepted.
-      const user = await verifyEmailCode(challengeId, code);
-      const session = await createSession(user);
+      const session = await runAuditedAction(
+        _req,
+        {
+          action: "auth.email_verified",
+          resourceType: "user",
+          details: { method: "email_code" },
+        },
+        async () => createSession(await verifyEmailCode(challengeId, code)),
+        (createdSession) => ({
+          actorId: createdSession.authUser.id,
+          resourceId: createdSession.authUser.id,
+          after: { emailVerified: true, sessionIssued: true },
+        }),
+      );
       setAuthCookies(res, session.accessToken, session.refreshToken);
-      res.json({ user: session.authUser });
+      sendSuccess(res, 200, "Email verified successfully.", { user: session.authUser });
     },
   ),
 );
@@ -151,8 +196,19 @@ authRouter.post(
     (req) => ({ body: req.body }),
     async (_req, res, { body }) => {
       // Only a checked challenge ID reaches the resend service.
-      const result = await resendVerificationCode(body.challengeId);
-      res.json(result);
+      const result = await runAuditedAction(
+        _req,
+        { action: "auth.verification_resent", resourceType: "user" },
+        () => resendVerificationCode(body.challengeId),
+        ({ userId, resendAvailableAt }) => ({
+          resourceId: userId,
+          after: { verificationCodeResent: true },
+          details: { resendAvailableAt },
+        }),
+      );
+      sendSuccess(res, 200, "Verification code sent.", {
+        resendAvailableAt: result.resendAvailableAt,
+      });
     },
   ),
 );
@@ -165,9 +221,18 @@ authRouter.post(
     (req) => ({ body: req.body }),
     async (_req, res, { body }) => {
       // Middleware checks the email and password before the session service receives them.
-      const session = await loginWithPassword(body);
+      const session = await runAuditedAction(
+        _req,
+        { action: "auth.login", resourceType: "user", details: { method: "password" } },
+        () => loginWithPassword(body),
+        (createdSession) => ({
+          actorId: createdSession.authUser.id,
+          resourceId: createdSession.authUser.id,
+          after: { sessionIssued: true },
+        }),
+      );
       setAuthCookies(res, session.accessToken, session.refreshToken);
-      res.json({ user: session.authUser });
+      sendSuccess(res, 200, "Signed in successfully.", { user: session.authUser });
     },
   ),
 );
@@ -175,20 +240,39 @@ authRouter.post(
 // Replace an expiring access token using the longer-lived refresh cookie.
 authRouter.post("/refresh", async (req, res) => {
   const incomingToken = req.cookies?.[REFRESH_COOKIE_NAME] as string | undefined;
-  const session = await refreshSession(incomingToken);
+  const session = await runAuditedAction(
+    req,
+    { action: "auth.session_refreshed", resourceType: "user" },
+    () => refreshSession(incomingToken),
+    (createdSession) => ({
+      actorId: createdSession.authUser.id,
+      resourceId: createdSession.authUser.id,
+      after: { sessionRefreshed: true },
+    }),
+  );
   setAuthCookies(res, session.accessToken, session.refreshToken);
-  res.json({ user: session.authUser });
+  sendSuccess(res, 200, "Session refreshed successfully.", { user: session.authUser });
 });
 
 // Revoke the saved refresh token and remove both cookies from this browser.
 authRouter.post("/logout", async (req, res) => {
   const incomingToken = req.cookies?.[REFRESH_COOKIE_NAME] as string | undefined;
-  await logoutSession(incomingToken);
+  await runAuditedAction(
+    req,
+    { action: "auth.logout", resourceType: "user" },
+    () => logoutSession(incomingToken),
+    (loggedOutUserId) => ({
+      actorId: loggedOutUserId,
+      resourceId: loggedOutUserId,
+      statusCode: 204,
+      after: { sessionRevoked: loggedOutUserId !== null },
+    }),
+  );
   clearAuthCookies(res);
   res.status(204).end();
 });
 
 // Return the user attached by requireAuth; no account details are queried here.
 authRouter.get("/me", requireAuth, (req, res) => {
-  res.json({ user: req.user });
+  sendSuccess(res, 200, "Current user retrieved.", { user: req.user });
 });

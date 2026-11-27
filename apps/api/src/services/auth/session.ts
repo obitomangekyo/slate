@@ -80,7 +80,9 @@ export async function refreshSession(incomingToken: string | undefined) {
 
 export async function logoutSession(incomingToken: string | undefined) {
   // Logout is safe to repeat; a missing or invalid cookie has nothing to revoke.
-  if (!incomingToken) return;
+  if (!incomingToken) return null;
   const userId = await verifyRefreshToken(incomingToken);
-  if (userId) await UserModel.findByIdAndUpdate(userId, { refreshTokenHash: null });
+  if (!userId) return null;
+  await UserModel.findByIdAndUpdate(userId, { refreshTokenHash: null });
+  return userId;
 }

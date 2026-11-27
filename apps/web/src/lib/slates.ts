@@ -1,5 +1,6 @@
 import type {
   ApiErrorResponse,
+  ApiSuccessResponse,
   CreateSlateInput,
   InviteSlateCollaboratorResult,
   InviteSlateCollaboratorsInput,
@@ -18,11 +19,12 @@ import type { AxiosError } from "axios";
 import { toastManager } from "#/components/ui/toast";
 import { api } from "#/lib/api";
 
+// Each query unwraps the shared API envelope and returns only the slate data its UI needs.
 export const slatesQueryOptions = queryOptions({
   queryKey: ["slates"] as const,
   queryFn: async () => {
-    const { data } = await api.get<{ slates: SlateSummary[] }>("/slates");
-    return data.slates;
+    const { data } = await api.get<ApiSuccessResponse<{ slates: SlateSummary[] }>>("/slates");
+    return data.data.slates;
   },
 });
 
@@ -41,19 +43,18 @@ export function slatePagesQueryOptions(options: SlateListOptions = {}) {
     queryKey: ["slates", "pages", options] as const,
     initialPageParam: null as string | null,
     queryFn: async ({ pageParam }) => {
-      const { data } = await api.get<{ slates: SlateSummary[]; nextCursor: string | null }>(
-        "/slates",
-        {
-          params: {
-            limit: options.limit ?? 12,
-            ...(typeof options.starred === "boolean" && { starred: options.starred }),
-            ...(options.scope && { scope: options.scope }),
-            ...(options.search && { search: options.search }),
-            ...(pageParam && { cursor: pageParam }),
-          },
+      const { data } = await api.get<
+        ApiSuccessResponse<{ slates: SlateSummary[]; nextCursor: string | null }>
+      >("/slates", {
+        params: {
+          limit: options.limit ?? 12,
+          ...(typeof options.starred === "boolean" && { starred: options.starred }),
+          ...(options.scope && { scope: options.scope }),
+          ...(options.search && { search: options.search }),
+          ...(pageParam && { cursor: pageParam }),
         },
-      );
-      return data;
+      });
+      return data.data;
     },
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
   });
@@ -63,8 +64,10 @@ export function slateDetailQueryOptions(slateId: string) {
   return queryOptions({
     queryKey: ["slates", slateId] as const,
     queryFn: async () => {
-      const { data } = await api.get<{ slate: SlateDetail }>(`/slates/${slateId}`);
-      return data.slate;
+      const { data } = await api.get<ApiSuccessResponse<{ slate: SlateDetail }>>(
+        `/slates/${slateId}`,
+      );
+      return data.data.slate;
     },
   });
 }
@@ -75,8 +78,10 @@ export function publicSlateQueryOptions(slateId: string) {
     // Public and authenticated board reads share a cache slot so the route has one board shape.
     queryKey: ["slates", slateId] as const,
     queryFn: async () => {
-      const { data } = await api.get<{ slate: SlateDetail }>(`/slates/public/${slateId}`);
-      return data.slate;
+      const { data } = await api.get<ApiSuccessResponse<{ slate: SlateDetail }>>(
+        `/slates/public/${slateId}`,
+      );
+      return data.data.slate;
     },
   });
 }
@@ -97,10 +102,12 @@ export function useUpdateSlateTitleMutation() {
     { slateId: string; title: string }
   >({
     mutationFn: async ({ slateId, title }) => {
-      const { data } = await api.patch<{
-        slate: { id: string; title: string; starred: boolean; updatedAt: string };
-      }>(`/slates/${slateId}`, { title });
-      return data.slate;
+      const { data } = await api.patch<
+        ApiSuccessResponse<{
+          slate: { id: string; title: string; starred: boolean; updatedAt: string };
+        }>
+      >(`/slates/${slateId}`, { title });
+      return data.data.slate;
     },
     onSuccess: (slate) => {
       queryClient.setQueryData(["slates", slate.id], (current: SlateDetail | undefined) =>
@@ -129,16 +136,18 @@ export function useUpdateSlateMutation() {
     { slateId: string; changes: { title?: string; isPublic?: boolean } }
   >({
     mutationFn: async ({ slateId, changes }) => {
-      const { data } = await api.patch<{
-        slate: {
-          id: string;
-          title: string;
-          isPublic: boolean;
-          starred: boolean;
-          updatedAt: string;
-        };
-      }>(`/slates/${slateId}`, changes);
-      return data.slate;
+      const { data } = await api.patch<
+        ApiSuccessResponse<{
+          slate: {
+            id: string;
+            title: string;
+            isPublic: boolean;
+            starred: boolean;
+            updatedAt: string;
+          };
+        }>
+      >(`/slates/${slateId}`, changes);
+      return data.data.slate;
     },
     onSuccess: (slate, { changes }) => {
       queryClient.setQueryData(["slates", slate.id], (current: SlateDetail | undefined) =>
@@ -192,10 +201,12 @@ export function useInviteCollaboratorsMutation(slateId: string) {
     InviteSlateCollaboratorsInput
   >({
     mutationFn: async (input) => {
-      const { data } = await api.post<{
-        results: InviteSlateCollaboratorResult[];
-      }>(`/slates/${slateId}/invitations`, input);
-      return data.results;
+      const { data } = await api.post<
+        ApiSuccessResponse<{
+          results: InviteSlateCollaboratorResult[];
+        }>
+      >(`/slates/${slateId}/invitations`, input);
+      return data.data.results;
     },
     onSuccess: (result) => {
       const sentCount = result.filter((item) => item.sent).length;
@@ -213,8 +224,11 @@ export function useCreateSlateMutation() {
 
   return useMutation<SlateSummary, AxiosError<ApiErrorResponse>, CreateSlateInput | undefined>({
     mutationFn: async (input) => {
-      const { data } = await api.post<{ slate: SlateSummary }>("/slates", input ?? {});
-      return data.slate;
+      const { data } = await api.post<ApiSuccessResponse<{ slate: SlateSummary }>>(
+        "/slates",
+        input ?? {},
+      );
+      return data.data.slate;
     },
     onSuccess: (createdSlate) => {
       queryClient.setQueryData<SlateSummary[]>(slatesQueryOptions.queryKey, (prev) =>

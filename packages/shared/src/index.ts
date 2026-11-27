@@ -1,6 +1,7 @@
 // Export shared auth contracts so both apps validate and type the same payloads.
 export {
   type AuthUser,
+  EmailInputSchema,
   type EmailVerificationChallenge,
   EmailVerificationChallengeSchema,
   type LoginInput,
@@ -27,8 +28,12 @@ export {
   MIN_SLATE_TITLE_LENGTH,
   NODE_TONES,
 } from "#/constants";
-// Keep the error response contract available to both API and web code.
-export { type ApiErrorResponse, ApiErrorSchema } from "#/error";
+// Keep response envelope contracts available to both web and API code.
+export {
+  type ApiErrorResponse,
+  ApiErrorSchema,
+  type ApiSuccessResponse,
+} from "#/error";
 // Export the canvas data shapes used when reading and writing board contents.
 export {
   type CanvasEdge,

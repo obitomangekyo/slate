@@ -16,9 +16,16 @@ export const UserSchema = z.object({
 
 export type AuthUser = z.infer<typeof UserSchema>;
 
+// Trim before checking email format, then lowercase for consistent account lookups.
+export const EmailInputSchema = z
+  .string()
+  .trim()
+  .pipe(z.email())
+  .transform((email) => email.toLowerCase());
+
 // Normalize email before looking up an account, and trim the display name.
 export const RegisterInputSchema = z.object({
-  email: z.email().trim().toLowerCase(),
+  email: EmailInputSchema,
   name: z.string().trim().min(2).max(MAX_USER_NAME_LENGTH),
   password: z.string().min(MIN_PASSWORD_LENGTH).max(MAX_PASSWORD_LENGTH),
 });
@@ -27,7 +34,7 @@ export type RegisterInput = z.infer<typeof RegisterInputSchema>;
 
 // Login accepts any non-empty password so old accounts can still be checked.
 export const LoginInputSchema = z.object({
-  email: z.email().trim().toLowerCase(),
+  email: EmailInputSchema,
   password: z.string().min(1).max(MAX_PASSWORD_LENGTH),
 });
 
